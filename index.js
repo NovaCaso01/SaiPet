@@ -1,0 +1,125 @@
+/**
+ * SaiPet - 메인 진입점
+ * 채팅창에 귀여운 가상 펫을 표시하고, 대화 상황에 맞게 반응합니다.
+ */
+
+import { extension_settings } from "../../../extensions.js";
+
+import { DEFAULT_SETTINGS, EXTENSION_NAME } from "./src/constants.js";
+import { state, log } from "./src/state.js";
+import { createUI } from "./src/ui.js";
+import { createPetContainer, removePetContainer, clampPetPosition } from "./src/pet-core.js";
+import { initReactions, destroyReactions } from "./src/pet-reactions.js";
+
+/**
+ * 모바일 감지 (UserAgent + 터치 전용)
+ * @returns {boolean}
+ */
+function detectMobile() {
+    const ua = navigator.userAgent || "";
+    const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+    const hasTouchOnly = ('ontouchstart' in window) && !window.matchMedia('(pointer: fine)').matches;
+    // PC에서 화면을 좁혀도 활성화 유지: UA가 모바일이거나, 터치 전용 + 마우스 없는 기기만 모바일 판정
+    return isMobileUA || hasTouchOnly;
+}
+
+/**
+ * 모바일/PC 전환 처리
+ */
+function handleDeviceChange() {
+    const wasMobile = state.isMobile;
+    state.isMobile = detectMobile();
+    
+    if (wasMobile === state.isMobile) return; // 변화 없으면 무시
+    
+    log(`Device changed: ${wasMobile ? 'mobile' : 'PC'} -> ${state.isMobile ? 'mobile' : 'PC'}`);
+    
+    // 모바일 알림 UI 업데이트
+    const notice = document.getElementById("stvp-mobile-notice");
+    if (notice) {
+        notice.style.display = state.isMobile ? "block" : "none";
+    }
+    
+    if (state.isMobile) {
+        // 모바일로 전환 → 펫 숨기기 + 이벤트 해제
+        removePetContainer();
+        destroyReactions();
+        log("Pet disabled (mobile detected)");
+    } else {
+        // PC로 전환 → 설정이 ON이면 펫 다시 활성화
+        if (state.settings.enabled) {
+            createPetContainer();
+            initReactions();
+            log("Pet re-enabled (PC detected)");
+        }
+    }
+}
+
+/**
+ * 모바일 감지 리스너 등록
+ */
+function setupMobileDetection() {
+    const onResize = () => {
+        handleDeviceChange();
+        clampPetPosition();
+    };
+    window.addEventListener("resize", onResize);
+    
+    // 정리 함수 저장
+    state.cleanupMobileDetect = () => {
+        window.removeEventListener("resize", onResize);
+    };
+}
+
+// jQuery 로드 대기
+jQuery(async () => {
+    // 설정 초기화
+    if (!extension_settings[EXTENSION_NAME]) {
+        extension_settings[EXTENSION_NAME] = structuredClone(DEFAULT_SETTINGS);
+    }
+
+    // 설정 병합 (새 설정 항목 추가 대응)
+    mergeSettings(extension_settings[EXTENSION_NAME], DEFAULT_SETTINGS);
+
+    state.settings = extension_settings[EXTENSION_NAME];
+
+    // UI 생성
+    await createUI();
+
+    // 모바일 감지
+    state.isMobile = detectMobile();
+    setupMobileDetection();
+
+    // 펫 초기화 (모바일이면 비활성화)
+    if (state.settings.enabled && !state.isMobile) {
+        createPetContainer();
+        initReactions();
+    }
+
+    if (state.isMobile) {
+        log("Extension loaded (mobile detected - pet disabled)");
+    } else {
+        log("Extension loaded successfully!");
+    }
+});
+
+/**
+ * 설정 병합 (깊은 병합)
+ * @param {Object} target - 대상 설정
+ * @param {Object} defaults - 기본값
+ */
+function mergeSettings(target, defaults) {
+    for (const key in defaults) {
+        if (defaults.hasOwnProperty(key)) {
+            if (target[key] === undefined) {
+                target[key] = structuredClone(defaults[key]);
+            } else if (
+                typeof defaults[key] === "object" &&
+                defaults[key] !== null &&
+                !Array.isArray(defaults[key])
+            ) {
+                mergeSettings(target[key], defaults[key]);
+            }
+        }
+    }
+}

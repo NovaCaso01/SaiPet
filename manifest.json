@@ -1,0 +1,12 @@
+{
+    "display_name": "SaiPet",
+    "loading_order": 10,
+    "requires": [],
+    "optional": [],
+    "js": "index.js",
+    "css": "style.css",
+    "author": "NovaCaso01",
+    "version": "1.0.0",
+    "homePage": "https://github.com/NovaCaso01/SaiPet",
+    "auto_update": true
+}

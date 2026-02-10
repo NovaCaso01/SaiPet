@@ -1,0 +1,739 @@
+/**
+ * SaiPet - 스타일시트
+ */
+
+/* ===== 설정 UI ===== */
+
+#saipet-settings {
+    margin-bottom: 10px;
+}
+
+#saipet-settings .inline-drawer-header b {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.stvp-section {
+    margin-bottom: 15px;
+    padding: 10px;
+    background: var(--SmartThemeBlurTintColor);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.stvp-section h5 {
+    margin: 0 0 10px 0;
+    padding-bottom: 5px;
+    border-bottom: 1px solid var(--SmartThemeBorderColor);
+    font-size: 0.95em;
+}
+
+.stvp-subsection {
+    margin-top: 10px;
+    padding: 10px;
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 5px;
+    overflow: hidden;
+}
+
+.stvp-subsection-title {
+    display: block;
+    font-size: 0.85em;
+    font-weight: bold;
+    color: var(--SmartThemeQuoteColor);
+    margin-bottom: 2px;
+}
+
+.stvp-divider {
+    border: none;
+    border-top: 1px solid var(--SmartThemeBorderColor);
+    margin: 10px 0;
+    opacity: 0.4;
+}
+
+.stvp-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.stvp-row:last-child {
+    margin-bottom: 0;
+}
+
+.stvp-row > label:first-child {
+    flex: 0 0 120px;
+    font-size: 0.9em;
+}
+
+.stvp-row input[type="text"],
+.stvp-row input[type="number"],
+.stvp-row select,
+.stvp-row textarea {
+    flex: 1;
+    min-width: 0;
+}
+
+.stvp-row input[type="range"] {
+    flex: 1;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.stvp-row input[type="color"] {
+    width: 40px;
+    height: 30px;
+    padding: 0;
+    border: none;
+    cursor: pointer;
+}
+
+.stvp-info {
+    margin-bottom: 8px;
+    padding: 5px 8px;
+    background: rgba(255, 193, 7, 0.1);
+    border-radius: 4px;
+}
+
+.stvp-info small {
+    color: var(--SmartThemeQuoteColor);
+    font-size: 0.85em;
+}
+
+/* 프리셋 버튼 */
+.stvp-preset-buttons {
+    flex-wrap: wrap;
+    gap: 5px !important;
+}
+
+.stvp-preset-buttons .menu_button {
+    flex: 1;
+    min-width: 80px;
+    font-size: 0.85em;
+    padding: 5px 8px;
+}
+
+/* 토글 스위치 */
+.stvp-toggle {
+    position: relative;
+    display: inline-block;
+    width: 40px;
+    height: 20px;
+    background: var(--SmartThemeBorderColor);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.stvp-toggle::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    background: white;
+    border-radius: 50%;
+    transition: transform 0.2s;
+}
+
+input[type="checkbox"]:checked + .stvp-toggle {
+    background: var(--SmartThemeQuoteColor);
+}
+
+input[type="checkbox"]:checked + .stvp-toggle::after {
+    transform: translateX(20px);
+}
+
+/* Virtual Pet 설정 내 체크박스만 숨김 (토글 스위치로 대체) */
+#saipet-settings input[type="checkbox"] {
+    display: none;
+}
+
+/* 스프라이트 그리드 */
+.stvp-sprite-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+    margin-top: 10px;
+    box-sizing: border-box;
+    width: 100%;
+}
+
+@media (max-width: 768px) {
+    .stvp-sprite-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+@media (max-width: 500px) {
+    .stvp-sprite-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+.stvp-sprite-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.stvp-sprite-label {
+    font-size: 0.75em;
+    color: var(--SmartThemeQuoteColor);
+    white-space: nowrap;
+}
+
+.stvp-sprite-preview {
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--SmartThemeBlurTintColor);
+    border: 2px dashed var(--SmartThemeBorderColor);
+    border-radius: 8px;
+    cursor: pointer;
+    overflow: hidden;
+    transition: border-color 0.2s;
+}
+
+.stvp-sprite-preview:hover {
+    border-color: var(--SmartThemeQuoteColor);
+}
+
+.stvp-sprite-preview img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.stvp-sprite-placeholder {
+    font-size: 20px;
+    color: var(--SmartThemeBorderColor);
+}
+
+.stvp-sprite-buttons {
+    display: flex;
+    gap: 3px;
+}
+
+.stvp-sprite-url {
+    padding: 1px 5px;
+    font-size: 0.7em;
+}
+
+.stvp-sprite-clear {
+    padding: 1px 6px;
+    font-size: 0.7em;
+}
+
+/* 대사 설정 */
+.stvp-speeches-container {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-top: 10px;
+}
+
+@media (max-width: 600px) {
+    .stvp-speeches-container {
+        grid-template-columns: 1fr;
+    }
+}
+
+.stvp-speech-item {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.stvp-speech-label {
+    font-size: 0.85em;
+    font-weight: bold;
+    color: var(--SmartThemeQuoteColor);
+}
+
+.stvp-speech-textarea {
+    min-height: 50px;
+    font-size: 0.85em;
+    resize: vertical;
+}
+
+/* ===== 펫 컨테이너 ===== */
+
+#saipet-container {
+    --pet-size: 250px;
+    
+    position: fixed;
+    z-index: 9999;
+    user-select: none;
+    touch-action: none;
+    pointer-events: auto;
+}
+
+#saipet-container.dragging {
+    cursor: grabbing;
+}
+
+.st-pet-wrapper {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* 펫 스프라이트 */
+.st-pet-sprite {
+    width: var(--pet-size);
+    height: var(--pet-size);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: calc(var(--pet-size) * 0.7);
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+.st-pet-sprite.has-image {
+    font-size: inherit;
+}
+
+.st-pet-sprite img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    pointer-events: none;
+}
+
+.st-pet-sprite.flipped {
+    transform: scaleX(-1);
+}
+
+/* 호버 효과 */
+.st-pet-sprite:hover {
+    transform: scale(1.1);
+}
+
+.st-pet-sprite.flipped:hover {
+    transform: scaleX(-1) scale(1.1);
+}
+
+/* 말풍선 */
+.st-pet-bubble {
+    --bubble-bg-color: #ffffff;
+    --bubble-offset-x: -50%;
+    
+    position: absolute;
+    bottom: calc(100% + 10px);
+    left: 50%;
+    transform: translateX(var(--bubble-offset-x));
+    padding: 10px 16px;
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+    white-space: normal;
+    width: max-content;
+    min-width: 80px;
+    max-width: min(450px, 80vw);
+    text-align: center;
+    font-size: 14px;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.st-pet-bubble.show {
+    opacity: 1;
+}
+
+.st-pet-bubble::after {
+    content: "";
+    position: absolute;
+    bottom: -8px;
+    left: var(--tail-left, 50%);
+    transform: translateX(-50%);
+    border-width: 8px 6px 0;
+    border-style: solid;
+    border-color: var(--bubble-bg-color, #ffffff) transparent transparent transparent;
+}
+
+/* 말풍선이 펫 하단에 표시될 때 */
+.st-pet-bubble.below {
+    bottom: auto;
+    top: calc(100% + 10px);
+}
+
+.st-pet-bubble.below::after {
+    bottom: auto;
+    top: -8px;
+    border-width: 0 6px 8px;
+    border-color: transparent transparent var(--bubble-bg-color, #ffffff) transparent;
+}
+
+.st-pet-bubble-text {
+    word-break: break-word;
+    white-space: pre-wrap;
+}
+
+/* 컨디션 행 (밥 버튼 + 게이지) */
+.st-pet-condition-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 22px;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+}
+
+#saipet-container:hover .st-pet-condition-row {
+    opacity: 1;
+}
+
+/* 배고픔 게이지 */
+.st-pet-hunger-bar {
+    width: 50px;
+    height: 6px;
+    background: rgba(128, 128, 128, 0.15);
+    border-radius: 20px;
+    overflow: hidden;
+    backdrop-filter: blur(2px);
+}
+
+.st-pet-hunger-fill {
+    height: 100%;
+    background: rgba(100, 180, 140, 0.65);
+    border-radius: 20px;
+    transition: width 0.5s ease, background-color 0.5s ease;
+}
+
+/* 밥주기 버튼 */
+.st-pet-feed-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 1px 3px;
+    border-radius: 6px;
+    line-height: 1;
+    transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.st-pet-feed-btn:hover {
+    transform: scale(1.25);
+    background: rgba(0, 0, 0, 0.08);
+}
+
+.st-pet-feed-btn:active {
+    transform: scale(0.9);
+}
+
+/* 말걸기 버튼 */
+.st-pet-chat-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 12px;
+    padding: 1px 3px;
+    border-radius: 6px;
+    line-height: 1;
+    transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.st-pet-chat-btn:hover {
+    transform: scale(1.25);
+    background: rgba(0, 0, 0, 0.08);
+}
+
+.st-pet-chat-btn:active {
+    transform: scale(0.9);
+}
+
+/* 말걸기 입력창 */
+.st-pet-chat-input {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 6px;
+    z-index: 10001;
+}
+
+.st-pet-chat-text {
+    width: 160px;
+    padding: 6px 10px;
+    border: 2px solid var(--SmartThemeBorderColor, #ccc);
+    border-radius: 12px;
+    background: var(--SmartThemeBodyColor, #fff);
+    color: var(--SmartThemeBodyTextColor, #333);
+    font-size: 13px;
+    outline: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+.st-pet-chat-text:focus {
+    border-color: var(--SmartThemeQuoteColor, #888);
+}
+
+.st-pet-chat-text::placeholder {
+    color: var(--SmartThemeBorderColor, #aaa);
+    font-size: 12px;
+}
+
+/* ===== 애니메이션 ===== */
+
+/* 바운스 */
+@keyframes petBounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-15px); }
+}
+
+#saipet-container.bounce .st-pet-sprite {
+    animation: petBounce 0.5s ease;
+}
+
+#saipet-container.bounce .st-pet-sprite.flipped {
+    animation: petBounceFlipped 0.5s ease;
+}
+
+@keyframes petBounceFlipped {
+    0%, 100% { transform: scaleX(-1) translateY(0); }
+    50% { transform: scaleX(-1) translateY(-15px); }
+}
+
+/* 흔들림 */
+@keyframes petShake {
+    0%, 100% { transform: rotate(0deg); }
+    25% { transform: rotate(-10deg); }
+    75% { transform: rotate(10deg); }
+}
+
+#saipet-container.shake .st-pet-sprite {
+    animation: petShake 0.5s ease;
+}
+
+#saipet-container.shake .st-pet-sprite.flipped {
+    animation: petShakeFlipped 0.5s ease;
+}
+
+@keyframes petShakeFlipped {
+    0%, 100% { transform: scaleX(-1) rotate(0deg); }
+    25% { transform: scaleX(-1) rotate(-10deg); }
+    75% { transform: scaleX(-1) rotate(10deg); }
+}
+
+/* 상태별 애니메이션 - 성능 최적화 */
+#saipet-container.state-thinking .st-pet-sprite,
+#saipet-container.state-sleeping .st-pet-sprite {
+    will-change: transform;
+}
+
+#saipet-container.state-thinking .st-pet-sprite {
+    animation: petThinking 2s ease-in-out infinite;
+}
+
+/* 드래그 중에는 상태 애니메이션 비활성화 + 크기 고정 */
+#saipet-container.dragging .st-pet-sprite {
+    animation: none !important;
+    transform: scale(1) !important;
+    will-change: auto !important;
+}
+
+@keyframes petThinking {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.03); }
+}
+
+#saipet-container.state-sleeping .st-pet-sprite {
+    animation: petSleeping 3s ease-in-out infinite;
+}
+
+@keyframes petSleeping {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(2px); }
+}
+
+/* 하트 파티클 (쓰다듬기) */
+.st-pet-heart-particle {
+    position: absolute;
+    top: 20%;
+    left: 50%;
+    pointer-events: none;
+    opacity: 0;
+    animation: heartFloat 1.1s ease-out forwards;
+    animation-delay: var(--h-delay, 0s);
+    z-index: 10;
+}
+
+@keyframes heartFloat {
+    0% {
+        opacity: 1;
+        transform: translate(0, 0) scale(0.5);
+    }
+    60% {
+        opacity: 1;
+    }
+    100% {
+        opacity: 0;
+        transform: translate(var(--h-x, 0px), -60px) scale(1.1) rotate(15deg);
+    }
+}
+
+/* 졸기 zzZ 이펙트 */
+.st-pet-zzz {
+    position: absolute;
+    top: 5%;
+    right: -5px;
+    pointer-events: none;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
+}
+
+.st-pet-zzz span {
+    opacity: 0;
+    animation: zzzFloat 3s ease-in-out infinite;
+    color: var(--SmartThemeBodyTextColor, #666);
+    font-weight: 600;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.zzz-1 {
+    font-size: 10px;
+    animation-delay: 0s !important;
+}
+.zzz-2 {
+    font-size: 13px;
+    animation-delay: 0.6s !important;
+    margin-left: 4px;
+}
+.zzz-3 {
+    font-size: 17px;
+    animation-delay: 1.2s !important;
+    margin-left: 8px;
+}
+
+@keyframes zzzFloat {
+    0% {
+        opacity: 0;
+        transform: translateY(5px);
+    }
+    20% {
+        opacity: 0.7;
+    }
+    80% {
+        opacity: 0.7;
+        transform: translateY(-12px);
+    }
+    100% {
+        opacity: 0;
+        transform: translateY(-18px);
+    }
+}
+
+/* ===== 모바일 대응 ===== */
+
+@media (max-width: 768px) {
+    .stvp-row > label:first-child {
+        flex: 0 0 100px;
+        font-size: 0.85em;
+    }
+    
+    .st-pet-bubble {
+        min-width: 80px;
+        padding: 8px 12px;
+    }
+}
+
+/* ===== 대화 로그 뷰어 ===== */
+
+.stvp-log-viewer {
+    max-height: 300px;
+    overflow-y: auto;
+    margin: 8px 0;
+    padding: 5px;
+    background: rgba(0, 0, 0, 0.08);
+    border-radius: 6px;
+    font-size: 0.85em;
+}
+
+.stvp-log-empty {
+    text-align: center;
+    padding: 20px;
+    color: var(--SmartThemeBorderColor);
+    font-style: italic;
+}
+
+.stvp-log-entry {
+    padding: 6px 8px;
+    margin-bottom: 4px;
+    border-radius: 5px;
+    background: rgba(0, 0, 0, 0.05);
+    border-left: 3px solid var(--SmartThemeBorderColor);
+}
+
+.stvp-log-entry:last-child {
+    margin-bottom: 0;
+}
+
+.stvp-log-direct {
+    border-left-color: #4CAF50;
+}
+
+.stvp-log-reaction {
+    border-left-color: #2196F3;
+}
+
+.stvp-log-time {
+    font-size: 0.75em;
+    color: var(--SmartThemeBodyTextColor);
+    opacity: 0.6;
+    margin-right: 6px;
+}
+
+.stvp-log-badge {
+    font-size: 0.7em;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: color-mix(in srgb, var(--SmartThemeBodyTextColor) 15%, transparent);
+    white-space: nowrap;
+}
+
+.stvp-log-user {
+    margin-top: 3px;
+    padding-left: 4px;
+    color: var(--SmartThemeQuoteColor);
+    font-size: 0.9em;
+}
+
+.stvp-log-pet {
+    margin-top: 2px;
+    padding-left: 4px;
+    font-size: 0.9em;
+}
+
+.stvp-log-buttons {
+    flex-wrap: wrap;
+    gap: 5px !important;
+}
+
+.stvp-log-buttons .menu_button {
+    flex: 1;
+    min-width: 80px;
+    font-size: 0.8em;
+    padding: 4px 6px;
+}
+
+/* ===== 다크모드 대응 ===== */
+
+.st-pet-bubble {
+    background-color: var(--bubble-bg-color, var(--SmartThemeBodyColor, #ffffff));
+    color: var(--SmartThemeBodyTextColor, #333333);
+}
