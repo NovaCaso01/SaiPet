@@ -17,17 +17,20 @@ export function getCurrentSprite() {
     const { customSprites } = state.settings.appearance;
     const currentState = state.currentState || PET_STATES.IDLE;
     
+    // 커스텀 이미지가 하나라도 설정되어 있는지 확인
+    const hasAnyCustom = Object.values(customSprites).some(v => v);
+    
     // 커스텀 스프라이트 우선 (해당 상태에 이미지가 있으면)
     if (customSprites[currentState]) {
         return customSprites[currentState];
     }
     
-    // 커스텀 idle이 있으면 다른 상태도 idle로 대체
-    if (customSprites.idle) {
+    // 커스텀 이미지가 하나라도 있으면 → idle 커스텀으로 대체 (이모지 안 씀)
+    if (hasAnyCustom && customSprites.idle) {
         return customSprites.idle;
     }
     
-    // 기본 이모지 스프라이트
+    // 커스텀 이미지가 전부 비어있을 때만 기본 이모지
     return DEFAULT_SPRITES[currentState] || DEFAULT_SPRITES.idle;
 }
 
