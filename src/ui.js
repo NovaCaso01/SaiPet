@@ -222,9 +222,6 @@ export async function createUI() {
                             ${fontOptions}
                         </select>
                     </div>
-                    <div class="stvp-info" style="margin-bottom:0;">
-                        <small><i class="fa-solid fa-font"></i> ST-Customizer 확장에서 제공하는 폰트를 사용합니다</small>
-                    </div>
                     <div class="stvp-row">
                         <label>최대 너비</label>
                         <input type="range" id="stvp-bubble-max-width" min="120" max="600" step="10">
