@@ -348,8 +348,8 @@ export async function triggerReaction(triggerType) {
     }
     
     // 커스텀 대사 표시 (idle, sleeping, interaction만)
-    // 배고픔 패널티: idle/sleeping 상태에서 배고프면 대사 변경
-    if (isHungry && (speechType === "idle" || speechType === "sleeping")) {
+    // 배고픔 패널티: idle 상태에서 배고프면 대사 변경 (sleeping은 유지)
+    if (isHungry && speechType === "idle") {
         speechType = "hungry";
         defaultMood = PET_STATES.SAD;
     }
