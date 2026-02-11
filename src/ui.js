@@ -712,7 +712,7 @@ function bindUIEvents() {
         const file = this.files[0];
         if (!file) return;
         
-        const base64 = await fileToBase64(file);
+        const base64 = await fileToBase64(file, 512, 0.9);
         if (!state.settings.walk) {
             state.settings.walk = { enabled: false, walkSprite: null };
         }

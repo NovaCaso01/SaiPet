@@ -920,7 +920,10 @@ export async function generateSpontaneousSpeech({ hunger, hour, minutesSinceInte
                          "아주 오랫동안 혼자 있었다";
         
         const spontaneousPrompt = ANTI_CENSORSHIP_PREAMBLE + `You are "${name}", a virtual pet character living on your ${userInfo.relation}'s screen.
-Your task: Generate a casual, everyday mumble or comment — as if you're thinking out loud or trying to get attention.
+
+## Trigger Event
+[System notification] The pet has been idle for a few minutes.
+Generate the pet's reaction to this idle timeout event.
 
 ## About You
 You are a small virtual pet widget — a desktop companion.
