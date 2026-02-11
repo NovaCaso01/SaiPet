@@ -168,9 +168,9 @@ function triggerEntryGreeting() {
     greetingCooldown = true;
     setTimeout(() => { greetingCooldown = false; }, 5000);
     
-    // 1. 오랜만에 접속 체크 (1시간 이상)
+    // 1. 오랜만에 접속 체크 (24시간 이상)
     const lastVisit = state.settings.condition?.lastVisit;
-    if (lastVisit && (now - lastVisit) > 3600000) {
+    if (lastVisit && (now - lastVisit) > 86400000) {
         log(`Long absence detected: ${Math.round((now - lastVisit) / 60000)} min`);
         state.settings.condition.lastVisit = now;
         saveSettings();
