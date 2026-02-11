@@ -114,8 +114,8 @@ export function playHearts() {
     const wrapper = container.querySelector(".st-pet-wrapper");
     if (!wrapper) return;
     
-    const hearts = ["❤", "💕", "💖", "🩷", "♥"];
-    const count = 4 + Math.floor(Math.random() * 3); // 4~6개
+    const hearts = ["🩷", "🖤"];
+    const count = 5 + Math.floor(Math.random() * 3); // 5~7개
     
     for (let i = 0; i < count; i++) {
         const heart = document.createElement("span");
@@ -123,14 +123,14 @@ export function playHearts() {
         heart.textContent = hearts[Math.floor(Math.random() * hearts.length)];
         
         // 랜덤 위치 + 크기 + 애니메이션 딜레이
-        heart.style.setProperty("--h-x", `${(Math.random() - 0.5) * 80}px`);
+        heart.style.setProperty("--h-x", `${(Math.random() - 0.5) * 100}px`);
         heart.style.setProperty("--h-delay", `${i * 0.1}s`);
-        heart.style.fontSize = `${12 + Math.random() * 10}px`;
+        heart.style.fontSize = `${18 + Math.random() * 14}px`;
         
         wrapper.appendChild(heart);
         
         // 애니메이션 끝나면 제거
-        setTimeout(() => heart.remove(), 1200);
+        setTimeout(() => heart.remove(), 1400);
     }
 }
 

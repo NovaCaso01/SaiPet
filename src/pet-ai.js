@@ -832,3 +832,95 @@ export async function showAIReaction() {
         return false;
     }
 }
+
+/**
+ * 자발적 말걸기 (펫이 스스로 말을 검)
+ * @param {Object} context - { hunger, hour, minutesSinceInteraction }
+ */
+export async function generateSpontaneousSpeech({ hunger, hour, minutesSinceInteraction }) {
+    if (!state.settings.personality.enabled) return;
+    if (state.isPetGenerating || state.isGenerating) return;
+    
+    try {
+        state.isPetGenerating = true;
+        setState(PET_STATES.THINKING);
+        
+        const { name, prompt } = state.settings.personality;
+        const personality = prompt || DEFAULT_PERSONALITY_PROMPT;
+        const userInfo = getUserPersona();
+        const petLogSection = getPetLogsForPrompt("all");
+        
+        // 상황 묘사
+        const timeDesc = hour >= 0 && hour <= 5 ? "새벽" :
+                         hour >= 6 && hour <= 10 ? "아침" :
+                         hour >= 11 && hour <= 13 ? "점심" :
+                         hour >= 14 && hour <= 17 ? "오후" :
+                         hour >= 18 && hour <= 21 ? "저녁" : "밤";
+        
+        const hungerDesc = hunger <= 10 ? "매우 배고프다 (거의 굶고 있음)" :
+                           hunger <= 30 ? "배가 꽤 고프다" :
+                           hunger <= 60 ? "약간 허기가 있다" : "배부르다";
+        
+        const idleDesc = minutesSinceInteraction <= 1 ? "방금 대화했다" :
+                         minutesSinceInteraction <= 5 ? "잠시 전에 대화했다" :
+                         minutesSinceInteraction <= 15 ? "한동안 조용하다" :
+                         minutesSinceInteraction <= 30 ? "꽤 오래 아무 일도 없었다" :
+                         "아주 오랫동안 혼자 있었다";
+        
+        const spontaneousPrompt = ANTI_CENSORSHIP_PREAMBLE + `You are "${name}", a virtual pet character living on your ${userInfo.relation}'s screen.
+Right now, you suddenly feel like saying something on your own. No one talked to you — you're just thinking out loud or trying to get attention.
+
+## Your Personality & Speech Style
+${personality}
+
+## Your ${userInfo.relation}
+- Name: ${userInfo.name}
+${userInfo.description ? `- About: ${userInfo.description}` : ""}
+
+${petLogSection}## Current Situation
+- Time: ${timeDesc} (${hour}시)
+- Hunger: ${hungerDesc} (${hunger}/100)
+- Interaction: ${idleDesc} (마지막 상호작용 ${minutesSinceInteraction}분 전)
+
+## Instructions
+Say something unprompted, as if you're:
+- Mumbling to yourself / thinking out loud
+- Trying to get your ${userInfo.relation}'s attention
+- Commenting on the time of day
+- Complaining about hunger (if hungry)
+- Just being yourself
+
+Rules:
+- Korean, 1-2 sentences. No single-word responses. Max 3 sentences.
+- Stay in character. Be natural — don't feel forced.
+- Output ONLY the dialogue. No quotes, labels, explanations, or actions.
+- Append mood tag: [MOOD:xxx]
+  Valid: happy, sad, excited, surprised, nervous, confident, shy, angry, thinking, idle, sleeping
+
+Example: 심심해... 아무도 나한테 관심 없나 [MOOD:sad]
+
+Dialogue:`;
+
+        const useCM = state.settings.api.useConnectionManager && state.settings.api.connectionProfile;
+        
+        let response;
+        if (useCM) {
+            response = await callConnectionManagerAPI(spontaneousPrompt);
+        } else {
+            response = await callDefaultAPI(spontaneousPrompt);
+        }
+        
+        const result = parseResponse(response);
+        log(`Spontaneous speech: [${result.mood}] ${result.text}`);
+        
+        if (result.text) {
+            setState(result.mood, 5000);
+            showSpeechBubble(result.text, null, true);
+            saveChatLog(result.text, result.mood, "spontaneous");
+        }
+    } catch (error) {
+        logError("generateSpontaneousSpeech error:", error);
+    } finally {
+        state.isPetGenerating = false;
+    }
+}

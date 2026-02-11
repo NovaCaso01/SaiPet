@@ -148,6 +148,7 @@ export function savePreset(name) {
         personality: stripUserInfo(state.settings.personality),
         customSpeeches: structuredClone(state.settings.customSpeeches),
         fallbackMessages: structuredClone(state.settings.fallbackMessages || {}),
+        walk: structuredClone(state.settings.walk || { enabled: false, walkSprite: null }),
     };
     
     if (!state.settings.savedPresets) {
@@ -183,6 +184,9 @@ export function loadPreset(presetId) {
     state.settings.customSpeeches = structuredClone(preset.customSpeeches);
     if (preset.fallbackMessages) {
         state.settings.fallbackMessages = structuredClone(preset.fallbackMessages);
+    }
+    if (preset.walk) {
+        state.settings.walk = structuredClone(preset.walk);
     }
     state.settings.currentPresetId = presetId;
     
@@ -233,6 +237,7 @@ export function updatePreset(presetId) {
     preset.personality = stripUserInfo(state.settings.personality);
     preset.customSpeeches = structuredClone(state.settings.customSpeeches);
     preset.fallbackMessages = structuredClone(state.settings.fallbackMessages || {});
+    preset.walk = structuredClone(state.settings.walk || { enabled: false, walkSprite: null });
     preset.updatedAt = new Date().toISOString();
     
     saveSettings();
@@ -279,6 +284,7 @@ export function exportPreset(presetId) {
                 personality: stripUserInfo(preset.personality),
                 customSpeeches: structuredClone(preset.customSpeeches),
                 fallbackMessages: structuredClone(preset.fallbackMessages || {}),
+                walk: structuredClone(preset.walk || { enabled: false, walkSprite: null }),
             },
         };
         fileName = `saipet-preset-${preset.name.replace(/[^a-zA-Z0-9\u3131-\uD79D]/g, "_")}.json`;
@@ -294,6 +300,7 @@ export function exportPreset(presetId) {
                 personality: stripUserInfo(state.settings.personality),
                 customSpeeches: structuredClone(state.settings.customSpeeches),
                 fallbackMessages: structuredClone(state.settings.fallbackMessages || {}),
+                walk: structuredClone(state.settings.walk || { enabled: false, walkSprite: null }),
             },
         };
         fileName = `saipet-preset-${state.settings.personality.name || "custom"}.json`;
@@ -343,6 +350,11 @@ export async function importPreset(file) {
                 // fallbackMessages가 없으면 빈 객체
                 if (!preset.fallbackMessages) {
                     preset.fallbackMessages = {};
+                }
+                
+                // walk가 없으면 기본값
+                if (!preset.walk) {
+                    preset.walk = { enabled: false, walkSprite: null };
                 }
                 
                 if (!state.settings.savedPresets) {
@@ -408,6 +420,12 @@ export function resetToDefaultMiyu() {
     state.settings.fallbackMessages = {
         noResponse: "...뭐라고?",
         apiError: "...잘 안 들렸어.",
+    };
+    
+    // 걷기 초기화 (기본 ON, 커스텀 이미지 제거)
+    state.settings.walk = {
+        enabled: true,
+        walkSprite: null,
     };
     
     // 현재 프리셋 선택 해제

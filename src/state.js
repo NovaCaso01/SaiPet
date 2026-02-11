@@ -12,6 +12,7 @@ export const state = {
     currentState: "idle",
     isDragging: false,
     idleTimer: null,
+    sleepTimer: null,
     bubbleTimer: null,
     isGenerating: false,
     isPetGenerating: false,  // 펫 자체 API 호출 중인지

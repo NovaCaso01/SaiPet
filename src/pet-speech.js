@@ -136,15 +136,16 @@ function adjustBubblePosition() {
  * 말풍선 스타일 적용
  */
 function applyBubbleStyle() {
-    if (!state.bubbleElement) return;
+    const container = document.getElementById("saipet-container");
+    if (!container) return;
     
-    const { backgroundColor, textColor } = state.settings.speechBubble;
+    const { backgroundColor, textColor, accentColor } = state.settings.speechBubble;
     
-    state.bubbleElement.style.backgroundColor = backgroundColor;
-    state.bubbleElement.style.color = textColor;
-    
-    // 꼬리(::after)에도 색상 동기화 — CSS 변수로 전달
-    state.bubbleElement.style.setProperty("--bubble-bg-color", backgroundColor);
+    // CSS 변수로 스타일 전달 (ST 테마 격리)
+    container.style.setProperty("--spc-bubble-bg", backgroundColor);
+    container.style.setProperty("--spc-bubble-text", textColor);
+    container.style.setProperty("--spc-accent", accentColor || "#7c9bff");
+    container.style.setProperty("--bubble-bg-color", backgroundColor);
 }
 
 /**

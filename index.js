@@ -13,14 +13,26 @@ import { initReactions, destroyReactions } from "./src/pet-reactions.js";
 
 /**
  * 모바일 감지 (UserAgent + 터치 전용)
+ * 태블릿은 모바일로 취급하지 않음 (iPad, Android 태블릿 등)
  * @returns {boolean}
  */
 function detectMobile() {
     const ua = navigator.userAgent || "";
-    const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+    
+    // 태블릿 감지 (태블릿은 활성화 유지)
+    const isTablet = /iPad/i.test(ua)
+        || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)  // iPadOS 13+
+        || (/Android/i.test(ua) && !/Mobile/i.test(ua));  // Android 태블릿 (Mobile 키워드 없음)
+    
+    if (isTablet) return false;
+    
+    // 스마트폰 감지
+    const isMobileUA = /Android.*Mobile|webOS|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
     const hasTouchOnly = ('ontouchstart' in window) && !window.matchMedia('(pointer: fine)').matches;
-    // PC에서 화면을 좁혀도 활성화 유지: UA가 모바일이거나, 터치 전용 + 마우스 없는 기기만 모바일 판정
-    return isMobileUA || hasTouchOnly;
+    const isSmallScreen = window.matchMedia('(max-width: 768px)').matches;
+    
+    // UA가 모바일이고 화면이 작을 때만 모바일 판정
+    return (isMobileUA && isSmallScreen) || (hasTouchOnly && isSmallScreen);
 }
 
 /**

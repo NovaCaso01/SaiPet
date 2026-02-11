@@ -4,7 +4,7 @@
 
 import { eventSource, event_types } from "../../../../../script.js";
 import { getContext } from "../../../../extensions.js";
-import { state, log } from "./state.js";
+import { state, log, logError } from "./state.js";
 import { saveSettings } from "./storage.js";
 import { setState, PET_STATES, playBounce, playShake, playHearts, showSleepZzz, hideSleepZzz } from "./pet-animation.js";
 import { showStateSpeech, showSpeechBubble } from "./pet-speech.js";
@@ -47,6 +47,9 @@ export function initReactions() {
     // 컨디션 시스템 시작 (배고픔 감소 등)
     startConditionTimer();
     
+    // 자발적 말걸기 타이머
+    startSpontaneousTimer();
+    
     log("Reactions initialized");
 }
 
@@ -62,6 +65,7 @@ export function destroyReactions() {
     
     stopIdleTimer();
     stopConditionTimer();
+    stopSpontaneousTimer();
     
     log("Reactions destroyed");
 }
@@ -212,8 +216,23 @@ export async function triggerReaction(triggerType) {
     log(`Trigger: ${triggerType}`);
     
     // sleeping 이외의 트리거면 zzz 이펙트 제거
-    if (triggerType !== "idle") {
+    if (triggerType !== "sleeping" && triggerType !== "idle") {
         hideSleepZzz();
+    }
+    
+    // === 배고픔 패널티 체크 ===
+    const hunger = state.settings.condition?.hunger ?? 100;
+    const isStarving = hunger <= 10;
+    const isHungry = hunger <= 30;
+    
+    // 배고프면 상호작용 무시 (50% 확률, 밥주기/배고픔 트리거는 예외)
+    if (isStarving && !["feeding", "hungry", "dragging"].includes(triggerType)) {
+        if (["click", "petting", "clickSpam"].includes(triggerType) && Math.random() < 0.5) {
+            showStateSpeech("hungry");
+            setState(PET_STATES.SAD, 2000);
+            log(`Hunger penalty: ignored ${triggerType} (starving)`);
+            return;
+        }
     }
     
     // 기본 상태 및 컨텍스트 결정
@@ -242,7 +261,13 @@ export async function triggerReaction(triggerType) {
             return;
             
         case "idle":
-            // 대기 시간 초과 시: 잠자기 대사
+            // 대기 시간 초과 (4분): 대기중 대사
+            defaultMood = PET_STATES.IDLE;
+            speechType = "idle";
+            break;
+
+        case "sleeping":
+            // 장기 대기 (10분): 잠자기 대사 + zzZ
             defaultMood = PET_STATES.SLEEPING;
             speechType = "sleeping";
             showSleepZzz();
@@ -323,7 +348,12 @@ export async function triggerReaction(triggerType) {
     }
     
     // 커스텀 대사 표시 (idle, sleeping, interaction만)
-    setState(defaultMood, triggerType === "idle" ? null : 2000);
+    // 배고픔 패널티: idle/sleeping 상태에서 배고프면 대사 변경
+    if (isHungry && (speechType === "idle" || speechType === "sleeping")) {
+        speechType = "hungry";
+        defaultMood = PET_STATES.SAD;
+    }
+    setState(defaultMood, triggerType === "idle" || triggerType === "sleeping" ? null : 2000);
     showStateSpeech(speechType);
 }
 
@@ -333,13 +363,20 @@ export async function triggerReaction(triggerType) {
 function startIdleTimer() {
     if (!state.settings.reactions.onIdle) return;
     
-    const timeout = state.settings.reactions.idleTimeout * 1000;
+    const idleTimeout = (state.settings.reactions.idleTimeout || 240) * 1000;
+    const sleepTimeout = (state.settings.reactions.sleepTimeout || 600) * 1000;
     
     state.idleTimer = setTimeout(() => {
         if (!state.isGenerating) {
             triggerReaction("idle");
         }
-    }, timeout);
+    }, idleTimeout);
+    
+    state.sleepTimer = setTimeout(() => {
+        if (!state.isGenerating) {
+            triggerReaction("sleeping");
+        }
+    }, sleepTimeout);
 }
 
 /**
@@ -348,6 +385,7 @@ function startIdleTimer() {
 function resetIdleTimer() {
     stopIdleTimer();
     startIdleTimer();
+    state._lastInteractionTime = Date.now();
 }
 
 /**
@@ -357,6 +395,10 @@ function stopIdleTimer() {
     if (state.idleTimer) {
         clearTimeout(state.idleTimer);
         state.idleTimer = null;
+    }
+    if (state.sleepTimer) {
+        clearTimeout(state.sleepTimer);
+        state.sleepTimer = null;
     }
 }
 
@@ -473,4 +515,79 @@ export function feedPet() {
     
     updateHungerGauge();
     triggerReaction("feeding");
+}
+
+// ===== 자발적 말걸기 시스템 =====
+
+let spontaneousTimer = null;
+
+/**
+ * 자발적 말걸기 타이머 시작
+ */
+export function startSpontaneousTimer() {
+    stopSpontaneousTimer();
+    
+    const config = state.settings.reactions.spontaneous;
+    if (!config?.enabled || !state.settings.personality.enabled) return;
+    
+    const minMs = (config.intervalMin || 15) * 60 * 1000;
+    const maxMs = (config.intervalMax || 30) * 60 * 1000;
+    const delay = minMs + Math.random() * (maxMs - minMs);
+    
+    log(`Spontaneous timer set: ${Math.round(delay / 60000)}분 후`);
+    
+    spontaneousTimer = setTimeout(async () => {
+        await trySpontaneousSpeech();
+        // 다음 타이머 재설정
+        startSpontaneousTimer();
+    }, delay);
+}
+
+/**
+ * 자발적 말걸기 타이머 중지
+ */
+export function stopSpontaneousTimer() {
+    if (spontaneousTimer) {
+        clearTimeout(spontaneousTimer);
+        spontaneousTimer = null;
+    }
+}
+
+/**
+ * 자발적 말걸기 시도
+ */
+async function trySpontaneousSpeech() {
+    // API 호출 중이면 스킵
+    if (state.isGenerating || state.isPetGenerating) {
+        log("Spontaneous skipped: API busy");
+        return;
+    }
+    
+    // AI 반응 비활성화면 스킵
+    if (!state.settings.personality.enabled) return;
+    
+    // 잠자기 상태면 스킵 (잠자는 펫은 말 안 걸음)
+    if (state.currentState === PET_STATES.SLEEPING) {
+        log("Spontaneous skipped: pet is sleeping");
+        return;
+    }
+    
+    // 상황 정보 수집
+    const hunger = state.settings.condition?.hunger ?? 100;
+    const hour = new Date().getHours();
+    const lastInteraction = state._lastInteractionTime || Date.now();
+    const minutesSinceInteraction = Math.round((Date.now() - lastInteraction) / 60000);
+    
+    log(`Spontaneous speech attempt: hunger=${hunger}, idle=${minutesSinceInteraction}min`);
+    
+    try {
+        // 자발적 말걸기 시 → zzZ만 제거 (타이머는 건드리지 않음)
+        hideSleepZzz();
+        state._lastInteractionTime = Date.now();
+        
+        const { generateSpontaneousSpeech } = await import("./pet-ai.js");
+        await generateSpontaneousSpeech({ hunger, hour, minutesSinceInteraction });
+    } catch (error) {
+        logError("Spontaneous speech error:", error);
+    }
 }

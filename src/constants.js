@@ -81,6 +81,12 @@ export const DEFAULT_SETTINGS = {
         flipHorizontal: false,
     },
     
+    // 걷기
+    walk: {
+        enabled: true,           // 걷기 ON/OFF
+        walkSprite: null,        // 걷기 전용 이미지 (없으면 기본 이미지)
+    },
+    
     // 펫 위치
     position: {
         location: "bottom-right",
@@ -104,9 +110,15 @@ export const DEFAULT_SETTINGS = {
         onUserMessage: true,
         onAIResponse: true,
         onIdle: true,
-        idleTimeout: 600,
+        idleTimeout: 240,
+        sleepTimeout: 600,
         onInteraction: true,
         reactionInterval: 3, // N번째 메시지마다 반응 (1 = 매번)
+        spontaneous: {
+            enabled: false,       // 자발적 말걸기 ON/OFF
+            intervalMin: 15,      // 최소 간격 (분)
+            intervalMax: 30,      // 최대 간격 (분)
+        },
     },
     
     // 상황별 커스텀 대사
@@ -149,8 +161,12 @@ export const DEFAULT_SETTINGS = {
     speechBubble: {
         enabled: true,
         duration: 15000,
+        design: "simple",         // simple, cute, classic, cyberpunk, retro, oriental
+        font: "default",          // 폰트 (default = 시스템)
+        maxWidth: 360,            // 최대 너비 (px, 120~600)
         backgroundColor: "#ffffff",
         textColor: "#333333",
+        accentColor: "#7c9bff",   // 강조색 (게이지, 버튼, 입력창)
     },
     
     // API 설정
@@ -158,7 +174,7 @@ export const DEFAULT_SETTINGS = {
         useConnectionManager: false,
         connectionProfile: null,
         maxTokens: 2000,
-        historyCount: 5, // 읽을 이전 메시지 수 (1~20)
+        historyCount: 6, // 읽을 이전 메시지 수 (1~20)
         reactionMode: "observer", // "observer" (관전자) | "character" (속마음)
         includeWorldInfo: false, // 월드인포(로어북) 포함 여부
     },
@@ -179,6 +195,9 @@ export const DEFAULT_SPRITES = {
     angry: "images/angry.png",
     dragging: "images/dragging.png",
 };
+
+// 기본 걷기 스프라이트 (미유 전용)
+export const DEFAULT_WALK_SPRITE = "images/walking.png";
 
 // 기본 성격 프롬프트 (츠데레 메이드 케모노미미)
 export const DEFAULT_PERSONALITY_PROMPT = `You are Miyu (미유), a cute tsundere cat-girl maid virtual pet.
@@ -308,3 +327,47 @@ export const MOOD_KEYWORDS = {
     thinking: ["음", "글쎄", "생각", "그런가", "아마", "혹시", "모르겠", "hmm", "think", "wonder"],
     sleeping: ["졸려", "피곤", "잠", "zzz", "하암", "sleepy", "tired"],
 };
+
+// 말풍선 디자인 테마
+export const BUBBLE_DESIGNS = {
+    simple: {
+        name: "🔲 심플",
+        defaults: { backgroundColor: "#ffffff", textColor: "#333333", accentColor: "#7c9bff" },
+    },
+    cute: {
+        name: "🎀 큐트",
+        defaults: { backgroundColor: "#fff0f5", textColor: "#7b4066", accentColor: "#ff8fa3" },
+    },
+    classic: {
+        name: "⚔️ 클래식",
+        defaults: { backgroundColor: "#fdf5e6", textColor: "#5c4033", accentColor: "#c9a84c" },
+    },
+    cyberpunk: {
+        name: "💠 사이버펑크",
+        defaults: { backgroundColor: "#0d1117", textColor: "#00ffd5", accentColor: "#00ffd5" },
+    },
+    retro: {
+        name: "🌈 레트로",
+        defaults: { backgroundColor: "#fffbe6", textColor: "#222222", accentColor: "#ff5555" },
+    },
+    oriental: {
+        name: "🏯 동양풍",
+        defaults: { backgroundColor: "#f4f7f1", textColor: "#3d4a3d", accentColor: "#8ba88b" },
+    },
+};
+
+// 폰트 목록 (ST-Customizer 확장 호환)
+export const FONT_LIST = [
+    { id: "default", name: "기본 (시스템)" },
+    { id: "Paperlogy", name: "페이퍼로지" },
+    { id: "Ridibatang", name: "리디바탕" },
+    { id: "BookkMyungjo", name: "부크크명조" },
+    { id: "OngleipKonkon", name: "온글잎 콘콘체" },
+    { id: "OmuDaye", name: "오뮤 다예쁨체" },
+    { id: "SchoolSafetyWing", name: "학교안심 날개" },
+    { id: "SchoolSafetyPictureDiary", name: "학교안심 그림일기" },
+    { id: "IsYun", name: "이서윤체" },
+    { id: "RoundedFixedsys", name: "둥근모꼴" },
+    { id: "ThinRounded", name: "얇은둥근모" },
+    { id: "Mulmaru", name: "물마루" },
+];
