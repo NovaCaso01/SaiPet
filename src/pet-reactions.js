@@ -367,13 +367,13 @@ function startIdleTimer() {
     const sleepTimeout = (state.settings.reactions.sleepTimeout || 600) * 1000;
     
     state.idleTimer = setTimeout(() => {
-        if (!state.isGenerating) {
+        if (!state.isGenerating && !state.isPetGenerating) {
             triggerReaction("idle");
         }
     }, idleTimeout);
     
     state.sleepTimer = setTimeout(() => {
-        if (!state.isGenerating) {
+        if (!state.isGenerating && !state.isPetGenerating) {
             triggerReaction("sleeping");
         }
     }, sleepTimeout);

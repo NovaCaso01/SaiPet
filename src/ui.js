@@ -7,7 +7,7 @@ import { state, log } from "./state.js";
 import { saveSettings, fileToBase64, savePreset, loadPreset, deletePreset, updatePreset, getPresetList, resetToDefaultMiyu, exportPreset, importPreset, resetAllSettings } from "./storage.js";
 import { createPetContainer, removePetContainer, updatePetPosition, updatePetSize, updatePetSprite, applyDesignTheme, startWalking, stopWalking } from "./pet-core.js";
 import { extension_settings } from "../../../../extensions.js";
-import { getLogs, clearLogs } from "./pet-ai.js";
+import { getLogs, clearLogs, deleteLogEntry } from "./pet-ai.js";
 import { startSpontaneousTimer, stopSpontaneousTimer } from "./pet-reactions.js";
 
 // 대화 로그 페이지네이션 상태
@@ -1049,20 +1049,22 @@ function refreshLogViewer() {
         const moodEmoji = getMoodEmoji(entry.mood);
         
         if (entry.type === "direct") {
-            html += `<div class="stvp-log-entry stvp-log-direct">
+            html += `<div class="stvp-log-entry stvp-log-direct" data-timestamp="${entry.timestamp}" data-type="direct">
                 <div class="stvp-log-header">
                     <span class="stvp-log-time"><i class="fa-regular fa-clock"></i> ${timeStr}</span>
                     <span class="stvp-log-badge stvp-log-badge-direct"><i class="fa-solid fa-comment"></i> 직접대화</span>
+                    <button class="stvp-log-delete-btn" title="이 로그 삭제"><i class="fa-solid fa-xmark"></i></button>
                 </div>
                 <div class="stvp-log-user"><i class="fa-solid fa-user"></i> ${escapeHtml(entry.userText)}</div>
                 <div class="stvp-log-pet"><i class="fa-solid fa-paw"></i> ${escapeHtml(entry.petResponse)}</div>
             </div>`;
         } else {
             const triggerLabel = getTriggerLabel(entry.trigger);
-            html += `<div class="stvp-log-entry stvp-log-reaction">
+            html += `<div class="stvp-log-entry stvp-log-reaction" data-timestamp="${entry.timestamp}" data-type="reaction">
                 <div class="stvp-log-header">
                     <span class="stvp-log-time"><i class="fa-regular fa-clock"></i> ${timeStr}</span>
                     <span class="stvp-log-badge stvp-log-badge-reaction"><i class="fa-solid fa-bolt"></i> ${triggerLabel}</span>
+                    <button class="stvp-log-delete-btn" title="이 로그 삭제"><i class="fa-solid fa-xmark"></i></button>
                 </div>
                 <div class="stvp-log-pet"><i class="fa-solid fa-paw"></i> ${escapeHtml(entry.petResponse)}</div>
             </div>`;
@@ -1070,6 +1072,24 @@ function refreshLogViewer() {
     }
     
     viewer.innerHTML = html;
+    
+    // 개별 삭제 버튼 이벤트
+    viewer.querySelectorAll(".stvp-log-delete-btn").forEach(btn => {
+        btn.addEventListener("click", function(e) {
+            e.stopPropagation();
+            const entry = this.closest(".stvp-log-entry");
+            const timestamp = parseInt(entry.dataset.timestamp);
+            const type = entry.dataset.type;
+            
+            deleteLogEntry(timestamp, type);
+            
+            // 삭제 애니메이션 후 새로고침
+            entry.style.transition = "opacity 0.2s, transform 0.2s";
+            entry.style.opacity = "0";
+            entry.style.transform = "translateX(20px)";
+            setTimeout(() => refreshLogViewer(), 200);
+        });
+    });
     
     // 페이지네이션 UI 업데이트
     if (totalPages > 1) {

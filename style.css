@@ -1125,6 +1125,29 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     margin-bottom: 4px;
 }
 
+.stvp-log-delete-btn {
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: var(--SmartThemeBodyTextColor);
+    opacity: 0;
+    cursor: pointer;
+    padding: 2px 5px;
+    border-radius: 3px;
+    font-size: 0.8em;
+    transition: opacity 0.15s, background 0.15s;
+}
+
+.stvp-log-entry:hover .stvp-log-delete-btn {
+    opacity: 0.5;
+}
+
+.stvp-log-delete-btn:hover {
+    opacity: 1 !important;
+    background: rgba(244, 67, 54, 0.15);
+    color: #f44336;
+}
+
 .stvp-log-direct {
     border-left-color: #4CAF50;
 }
