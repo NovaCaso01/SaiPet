@@ -778,7 +778,7 @@ async function callDefaultAPI(prompt) {
     const result = await generateRaw({
         prompt: prompt,
         quietToLoud: false,
-        responseLength: 150,
+        responseLength: state.settings.api.maxTokens || 2000,
     });
     return result || "";
 }
