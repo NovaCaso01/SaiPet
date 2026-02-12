@@ -14,6 +14,59 @@
     gap: 5px;
 }
 
+/* ===== 탭 메뉴 ===== */
+
+.stvp-tab-bar {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 12px;
+    border-bottom: 2px solid var(--SmartThemeBorderColor, #ddd);
+    padding-bottom: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.stvp-tab-bar::-webkit-scrollbar {
+    display: none;
+}
+
+.stvp-tab-btn {
+    flex: 1;
+    padding: 7px 6px;
+    border: none;
+    background: transparent;
+    color: var(--SmartThemeEmColor, #999);
+    font-size: 0.82em;
+    font-weight: 600;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: color 0.15s, border-color 0.15s;
+    white-space: nowrap;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+}
+
+.stvp-tab-btn:hover {
+    color: var(--SmartThemeBodyColor, #333);
+}
+
+.stvp-tab-btn.active {
+    color: var(--SmartThemeQuoteColor, #6fa8dc);
+    border-bottom-color: var(--SmartThemeQuoteColor, #6fa8dc);
+}
+
+.stvp-tab-content {
+    display: none;
+}
+
+.stvp-tab-content.active {
+    display: block;
+}
+
 .stvp-section {
     margin-bottom: 15px;
     padding: 10px;
@@ -32,7 +85,8 @@
 .stvp-subsection {
     margin-top: 10px;
     padding: 10px;
-    background: rgba(0, 0, 0, 0.1);
+    background: var(--SmartThemeBlurTintColor, rgba(255, 255, 255, 0.5));
+    border: 1px solid var(--SmartThemeBorderColor, rgba(0, 0, 0, 0.1));
     border-radius: 5px;
     overflow: hidden;
 }
@@ -102,6 +156,12 @@
 .stvp-info small {
     color: var(--SmartThemeQuoteColor);
     font-size: 0.85em;
+}
+
+.stvp-export-info {
+    background: rgba(100, 180, 255, 0.08);
+    border-left: 3px solid var(--SmartThemeQuoteColor, #6fa8dc);
+    line-height: 1.6;
 }
 
 /* 프리셋 버튼 */
@@ -1094,7 +1154,8 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     overflow-y: auto;
     margin: 8px 0;
     padding: 5px;
-    background: rgba(0, 0, 0, 0.08);
+    background: var(--SmartThemeBlurTintColor, rgba(255, 255, 255, 0.5));
+    border: 1px solid var(--SmartThemeBorderColor, rgba(0, 0, 0, 0.1));
     border-radius: 6px;
     font-size: 0.85em;
 }

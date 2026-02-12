@@ -149,6 +149,7 @@ export function savePreset(name) {
         customSpeeches: structuredClone(state.settings.customSpeeches),
         fallbackMessages: structuredClone(state.settings.fallbackMessages || {}),
         walk: structuredClone(state.settings.walk || { enabled: false, walkSprite: null }),
+        speechBubble: structuredClone(state.settings.speechBubble),
     };
     
     if (!state.settings.savedPresets) {
@@ -186,7 +187,11 @@ export function loadPreset(presetId) {
         state.settings.fallbackMessages = structuredClone(preset.fallbackMessages);
     }
     if (preset.walk) {
-        state.settings.walk = structuredClone(preset.walk);
+        // walk.enabled는 유저 기존값 유지, walkSprite만 적용
+        state.settings.walk.walkSprite = preset.walk.walkSprite || null;
+    }
+    if (preset.speechBubble) {
+        state.settings.speechBubble = structuredClone(preset.speechBubble);
     }
     state.settings.currentPresetId = presetId;
     
@@ -238,6 +243,7 @@ export function updatePreset(presetId) {
     preset.customSpeeches = structuredClone(state.settings.customSpeeches);
     preset.fallbackMessages = structuredClone(state.settings.fallbackMessages || {});
     preset.walk = structuredClone(state.settings.walk || { enabled: false, walkSprite: null });
+    preset.speechBubble = structuredClone(state.settings.speechBubble);
     preset.updatedAt = new Date().toISOString();
     
     saveSettings();
@@ -284,7 +290,8 @@ export function exportPreset(presetId) {
                 personality: stripUserInfo(preset.personality),
                 customSpeeches: structuredClone(preset.customSpeeches),
                 fallbackMessages: structuredClone(preset.fallbackMessages || {}),
-                walk: structuredClone(preset.walk || { enabled: false, walkSprite: null }),
+                walk: { walkSprite: (preset.walk?.walkSprite || null) },
+                speechBubble: structuredClone(preset.speechBubble || state.settings.speechBubble),
             },
         };
         fileName = `saipet-preset-${preset.name.replace(/[^a-zA-Z0-9\u3131-\uD79D]/g, "_")}.json`;
@@ -300,7 +307,8 @@ export function exportPreset(presetId) {
                 personality: stripUserInfo(state.settings.personality),
                 customSpeeches: structuredClone(state.settings.customSpeeches),
                 fallbackMessages: structuredClone(state.settings.fallbackMessages || {}),
-                walk: structuredClone(state.settings.walk || { enabled: false, walkSprite: null }),
+                walk: { walkSprite: (state.settings.walk?.walkSprite || null) },
+                speechBubble: structuredClone(state.settings.speechBubble),
             },
         };
         fileName = `saipet-preset-${state.settings.personality.name || "custom"}.json`;
@@ -352,9 +360,16 @@ export async function importPreset(file) {
                     preset.fallbackMessages = {};
                 }
                 
-                // walk가 없으면 기본값
+                // walk가 없으면 기본값 (enabled는 유저 기존값 유지)
                 if (!preset.walk) {
-                    preset.walk = { enabled: false, walkSprite: null };
+                    preset.walk = { walkSprite: null };
+                }
+                // enabled가 포함되어 있으면 제거 (유저 기존값 보존)
+                delete preset.walk.enabled;
+                
+                // speechBubble이 없으면 기본값 유지
+                if (!preset.speechBubble) {
+                    preset.speechBubble = structuredClone(state.settings.speechBubble);
                 }
                 
                 if (!state.settings.savedPresets) {
@@ -452,9 +467,10 @@ export function resetAllSettings() {
     saveSettings();
     
     // 스프라이트 업데이트
-    import("./pet-core.js").then(({ updatePetSprite, updatePetSize, updatePetPosition }) => {
+    import("./pet-core.js").then(({ updatePetSprite, updatePetSize, updatePetPosition, updatePetOpacity }) => {
         updatePetSprite();
         updatePetSize();
         updatePetPosition();
+        updatePetOpacity();
     });
 }

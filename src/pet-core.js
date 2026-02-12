@@ -56,6 +56,9 @@ export function createPetContainer() {
     // 크기 설정
     updatePetSize();
     
+    // 투명도 설정
+    updatePetOpacity();
+    
     // 디자인 테마 적용
     applyDesignTheme();
     
@@ -170,6 +173,17 @@ export function updatePetSize() {
     
     const size = state.settings.appearance.size;
     container.style.setProperty("--pet-size", `${size}px`);
+}
+
+/**
+ * 펫 투명도 업데이트
+ */
+export function updatePetOpacity() {
+    const container = document.getElementById("saipet-container");
+    if (!container) return;
+    
+    const opacity = (state.settings.appearance.opacity ?? 100) / 100;
+    container.style.opacity = opacity;
 }
 
 /**

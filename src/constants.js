@@ -79,6 +79,7 @@ export const DEFAULT_SETTINGS = {
         },
         size: 250,
         flipHorizontal: false,
+        opacity: 100,
     },
     
     // 걷기
@@ -114,11 +115,6 @@ export const DEFAULT_SETTINGS = {
         sleepTimeout: 600,
         onInteraction: true,
         reactionInterval: 3, // N번째 메시지마다 반응 (1 = 매번)
-        spontaneous: {
-            enabled: false,       // 자발적 말걸기 ON/OFF
-            intervalMin: 15,      // 최소 간격 (분)
-            intervalMax: 30,      // 최대 간격 (분)
-        },
     },
     
     // 상황별 커스텀 대사

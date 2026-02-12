@@ -47,9 +47,6 @@ export function initReactions() {
     // 컨디션 시스템 시작 (배고픔 감소 등)
     startConditionTimer();
     
-    // 자발적 말걸기 타이머
-    startSpontaneousTimer();
-    
     log("Reactions initialized");
 }
 
@@ -65,7 +62,6 @@ export function destroyReactions() {
     
     stopIdleTimer();
     stopConditionTimer();
-    stopSpontaneousTimer();
     
     log("Reactions destroyed");
 }
@@ -517,77 +513,4 @@ export function feedPet() {
     triggerReaction("feeding");
 }
 
-// ===== 자발적 말걸기 시스템 =====
 
-let spontaneousTimer = null;
-
-/**
- * 자발적 말걸기 타이머 시작
- */
-export function startSpontaneousTimer() {
-    stopSpontaneousTimer();
-    
-    const config = state.settings.reactions.spontaneous;
-    if (!config?.enabled || !state.settings.personality.enabled) return;
-    
-    const minMs = (config.intervalMin || 15) * 60 * 1000;
-    const maxMs = (config.intervalMax || 30) * 60 * 1000;
-    const delay = minMs + Math.random() * (maxMs - minMs);
-    
-    log(`Spontaneous timer set: ${Math.round(delay / 60000)}분 후`);
-    
-    spontaneousTimer = setTimeout(async () => {
-        await trySpontaneousSpeech();
-        // 다음 타이머 재설정
-        startSpontaneousTimer();
-    }, delay);
-}
-
-/**
- * 자발적 말걸기 타이머 중지
- */
-export function stopSpontaneousTimer() {
-    if (spontaneousTimer) {
-        clearTimeout(spontaneousTimer);
-        spontaneousTimer = null;
-    }
-}
-
-/**
- * 자발적 말걸기 시도
- */
-async function trySpontaneousSpeech() {
-    // API 호출 중이면 스킵
-    if (state.isGenerating || state.isPetGenerating) {
-        log("Spontaneous skipped: API busy");
-        return;
-    }
-    
-    // AI 반응 비활성화면 스킵
-    if (!state.settings.personality.enabled) return;
-    
-    // 잠자기 상태면 스킵 (잠자는 펫은 말 안 걸음)
-    if (state.currentState === PET_STATES.SLEEPING) {
-        log("Spontaneous skipped: pet is sleeping");
-        return;
-    }
-    
-    // 상황 정보 수집
-    const hunger = state.settings.condition?.hunger ?? 100;
-    const hour = new Date().getHours();
-    const lastInteraction = state._lastInteractionTime || Date.now();
-    const minutesSinceInteraction = Math.round((Date.now() - lastInteraction) / 60000);
-    
-    log(`Spontaneous speech attempt: hunger=${hunger}, idle=${minutesSinceInteraction}min`);
-    
-    try {
-        // 자발적 말걸기 시 → zzZ만 제거 (타이머는 건드리지 않음)
-        hideSleepZzz();
-        state._lastInteractionTime = Date.now();
-        
-        const { generateSpontaneousSpeech } = await import("./pet-ai.js");
-        await generateSpontaneousSpeech({ hunger, hour, minutesSinceInteraction });
-    } catch (error) {
-        logError("Spontaneous speech error:", error);
-    }
-}

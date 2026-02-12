@@ -5,10 +5,9 @@
 import { EXTENSION_NAME, MOOD_LABELS, POSITION_PRESETS, DEFAULT_SPEECHES, BUBBLE_DESIGNS, FONT_LIST } from "./constants.js";
 import { state, log } from "./state.js";
 import { saveSettings, fileToBase64, savePreset, loadPreset, deletePreset, updatePreset, getPresetList, resetToDefaultMiyu, exportPreset, importPreset, resetAllSettings } from "./storage.js";
-import { createPetContainer, removePetContainer, updatePetPosition, updatePetSize, updatePetSprite, applyDesignTheme, startWalking, stopWalking } from "./pet-core.js";
+import { createPetContainer, removePetContainer, updatePetPosition, updatePetSize, updatePetOpacity, updatePetSprite, applyDesignTheme, startWalking, stopWalking } from "./pet-core.js";
 import { extension_settings } from "../../../../extensions.js";
 import { getLogs, clearLogs, deleteLogEntry } from "./pet-ai.js";
-import { startSpontaneousTimer, stopSpontaneousTimer } from "./pet-reactions.js";
 
 // 대화 로그 페이지네이션 상태
 const LOG_PAGE_SIZE = 10;
@@ -77,7 +76,7 @@ export async function createUI() {
             </div>
             <div class="inline-drawer-content">
                 
-                <!-- ━━━ 기본 ━━━ -->
+                <!-- ━━━ 기본 ON/OFF ━━━ -->
                 <div class="stvp-section">
                     <div class="stvp-row">
                         <label>활성화</label>
@@ -89,317 +88,335 @@ export async function createUI() {
                     </div>
                 </div>
 
-                <!-- ━━━ 프리셋 관리 ━━━ -->
-                <div class="stvp-section">
-                    <h5><i class="fa-solid fa-floppy-disk"></i> 프리셋 관리</h5>
-                    <div class="stvp-row">
-                        <label>저장된 프리셋</label>
-                        <select id="stvp-preset-select" class="text_pole">
-                            <option value="">-- 선택 --</option>
-                        </select>
-                    </div>
-                    <div class="stvp-row stvp-preset-buttons">
-                        <button class="menu_button" id="stvp-preset-load" title="불러오기"><i class="fa-solid fa-folder-open"></i> 불러오기</button>
-                        <button class="menu_button" id="stvp-preset-save" title="현재 설정 저장"><i class="fa-solid fa-floppy-disk"></i> 새로 저장</button>
-                        <button class="menu_button" id="stvp-preset-update" title="선택된 프리셋에 덮어쓰기"><i class="fa-solid fa-arrows-rotate"></i> 덮어쓰기</button>
-                        <button class="menu_button" id="stvp-preset-delete" title="삭제"><i class="fa-solid fa-trash-can"></i> 삭제</button>
-                    </div>
-                    <div class="stvp-row stvp-preset-buttons">
-                        <button class="menu_button" id="stvp-preset-export" title="프리셋 파일로 내보내기"><i class="fa-solid fa-file-export"></i> 내보내기</button>
-                        <button class="menu_button" id="stvp-preset-import" title="프리셋 파일 가져오기"><i class="fa-solid fa-file-import"></i> 가져오기</button>
-                        <button class="menu_button" id="stvp-preset-default" title="기본 미유로 초기화"><i class="fa-solid fa-cat"></i> 기본 미유</button>
-                        <input type="file" id="stvp-preset-import-file" accept=".json" style="display:none;">
-                    </div>
+                <!-- ━━━ 탭 메뉴 ━━━ -->
+                <div class="stvp-tab-bar">
+                    <button class="stvp-tab-btn active" data-tab="basic"><i class="fa-solid fa-paw"></i> 기본</button>
+                    <button class="stvp-tab-btn" data-tab="visual"><i class="fa-solid fa-palette"></i> 외형</button>
+                    <button class="stvp-tab-btn" data-tab="chat"><i class="fa-solid fa-comment"></i> 대화</button>
+                    <button class="stvp-tab-btn" data-tab="log"><i class="fa-solid fa-clipboard-list"></i> 로그</button>
                 </div>
 
-                <!-- ━━━ 펫 캐릭터 ━━━ -->
-                <div class="stvp-section">
-                    <h5><i class="fa-solid fa-paw"></i> 펫 캐릭터</h5>
-                    <div class="stvp-row">
-                        <label>펫 이름</label>
-                        <input type="text" id="stvp-pet-name" class="text_pole" placeholder="냥이">
-                    </div>
-                    <div class="stvp-row">
-                        <label>커스텀 성격</label>
-                        <textarea id="stvp-personality-prompt" class="text_pole" rows="4" placeholder="커스텀 성격 프롬프트 (비우면 기본 고양이 성격 사용)"></textarea>
-                    </div>
-                    <hr class="stvp-divider">
-                    <label class="stvp-subsection-title"><i class="fa-solid fa-user"></i> 유저 정보</label>
-                    <div class="stvp-row" style="margin-top:6px;">
-                        <label>유저와의 관계</label>
-                        <input type="text" id="stvp-user-relation" class="text_pole" placeholder="예: 주인, 친구, 동거인, 연인... (비우면 주인)">
-                    </div>
-                    <div class="stvp-row">
-                        <label>유저 이름</label>
-                        <input type="text" id="stvp-owner-name" class="text_pole" placeholder="비우면 ST 페르소나 이름 사용">
-                    </div>
-                    <div class="stvp-row">
-                        <label>유저 설정</label>
-                        <textarea id="stvp-owner-persona" class="text_pole" rows="3" placeholder="펫에게 알려줄 유저 정보 (비우면 ST 페르소나 사용)"></textarea>
-                    </div>
-                </div>
+                <!-- ══════ 탭1: 기본 ══════ -->
+                <div class="stvp-tab-content active" data-tab="basic">
 
-                <!-- ━━━ 외형 ━━━ -->
-                <div class="stvp-section">
-                    <h5><i class="fa-solid fa-palette"></i> 외형</h5>
-                    <div class="stvp-row">
-                        <label>크기 (px)</label>
-                        <input type="number" id="stvp-size" class="text_pole" min="20" max="500" step="1" style="width: 70px;">
-                    </div>
-                    <div class="stvp-row">
-                        <label>좌우 반전</label>
-                        <input type="checkbox" id="stvp-flip">
-                        <label class="stvp-toggle" for="stvp-flip"></label>
-                    </div>
-
-                    <div class="stvp-subsection">
-                        <label class="stvp-subsection-title">기분별 이미지</label>
-                        <div class="stvp-info" style="margin-top:6px;">
-                            <small><i class="fa-solid fa-lightbulb"></i> 기분별 이미지를 업로드하세요 (GIF 가능). 비어있으면 기본 이모지 사용</small>
+                    <!-- 프리셋 관리 -->
+                    <div class="stvp-section">
+                        <h5><i class="fa-solid fa-floppy-disk"></i> 프리셋 관리</h5>
+                        <div class="stvp-row">
+                            <label>저장된 프리셋</label>
+                            <select id="stvp-preset-select" class="text_pole">
+                                <option value="">-- 선택 --</option>
+                            </select>
                         </div>
-                        <div class="stvp-sprite-grid">
-                            ${spriteUploadsHtml}
-                            <div class="stvp-sprite-item" id="stvp-walk-sprite-item">
-                                <span class="stvp-sprite-label">걷기</span>
-                                <div class="stvp-sprite-preview" id="stvp-walk-preview">
-                                    <span class="stvp-sprite-placeholder">+</span>
-                                </div>
-                                <input type="file" id="stvp-walk-sprite-file" accept="image/*,.gif,.webp" style="display:none;">
-                                <div class="stvp-sprite-buttons">
-                                    <button class="stvp-sprite-url menu_button" id="stvp-walk-sprite-url" title="URL로 등록"><i class="fa-solid fa-link"></i></button>
-                                    <button class="stvp-sprite-clear menu_button" id="stvp-walk-sprite-clear" style="display:none;">✕</button>
+                        <div class="stvp-row stvp-preset-buttons">
+                            <button class="menu_button" id="stvp-preset-load" title="불러오기"><i class="fa-solid fa-folder-open"></i> 불러오기</button>
+                            <button class="menu_button" id="stvp-preset-save" title="현재 설정 저장"><i class="fa-solid fa-floppy-disk"></i> 새로 저장</button>
+                            <button class="menu_button" id="stvp-preset-update" title="선택된 프리셋에 덮어쓰기"><i class="fa-solid fa-arrows-rotate"></i> 덮어쓰기</button>
+                            <button class="menu_button" id="stvp-preset-delete" title="삭제"><i class="fa-solid fa-trash-can"></i> 삭제</button>
+                        </div>
+                        <div class="stvp-row stvp-preset-buttons">
+                            <button class="menu_button" id="stvp-preset-export" title="프리셋 파일로 내보내기"><i class="fa-solid fa-file-export"></i> 내보내기</button>
+                            <button class="menu_button" id="stvp-preset-import" title="프리셋 파일 가져오기"><i class="fa-solid fa-file-import"></i> 가져오기</button>
+                            <button class="menu_button" id="stvp-preset-default" title="기본 미유로 초기화"><i class="fa-solid fa-cat"></i> 기본 미유</button>
+                            <input type="file" id="stvp-preset-import-file" accept=".json" style="display:none;">
+                        </div>
+                        <div class="stvp-info stvp-export-info">
+                            <small>
+                                <i class="fa-solid fa-circle-info"></i> <b>내보내기/가져오기 안내</b><br>
+                                <span style="color:var(--SmartThemeBodyColor);">- 포함: 펫 이름 · 성격 · 관계 · 외형(이미지/크기) · 말풍선 · 대사</span><br>
+                                <span style="color:var(--SmartThemeQuoteColor);">- 제외: 유저 이름 · 유저 설정(페르소나) · API · 로그 등</span>
+                            </small>
+                        </div>
+                    </div>
+
+                    <!-- 펫 캐릭터 -->
+                    <div class="stvp-section">
+                        <h5><i class="fa-solid fa-paw"></i> 펫 캐릭터</h5>
+                        <div class="stvp-row">
+                            <label>펫 이름</label>
+                            <input type="text" id="stvp-pet-name" class="text_pole" placeholder="냥이">
+                        </div>
+                        <div class="stvp-row">
+                            <label>커스텀 성격</label>
+                            <textarea id="stvp-personality-prompt" class="text_pole" rows="4" placeholder="커스텀 성격 프롬프트 (비우면 기본 고양이 성격 사용)"></textarea>
+                        </div>
+                        <hr class="stvp-divider">
+                        <label class="stvp-subsection-title"><i class="fa-solid fa-user"></i> 유저 정보</label>
+                        <div class="stvp-row" style="margin-top:6px;">
+                            <label>유저와의 관계</label>
+                            <input type="text" id="stvp-user-relation" class="text_pole" placeholder="예: 주인, 친구, 동거인, 연인... (비우면 주인)">
+                        </div>
+                        <div class="stvp-row">
+                            <label>유저 이름</label>
+                            <input type="text" id="stvp-owner-name" class="text_pole" placeholder="비우면 ST 페르소나 이름 사용">
+                        </div>
+                        <div class="stvp-row">
+                            <label>유저 설정</label>
+                            <textarea id="stvp-owner-persona" class="text_pole" rows="3" placeholder="펫에게 알려줄 유저 정보 (비우면 ST 페르소나 사용)"></textarea>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- ══════ 탭2: 외형 ══════ -->
+                <div class="stvp-tab-content" data-tab="visual">
+
+                    <!-- 외형 -->
+                    <div class="stvp-section">
+                        <h5><i class="fa-solid fa-palette"></i> 외형</h5>
+                        <div class="stvp-row">
+                            <label>크기 (px)</label>
+                            <input type="number" id="stvp-size" class="text_pole" min="20" max="500" step="1" style="width: 70px;">
+                        </div>
+                        <div class="stvp-row">
+                            <label>좌우 반전</label>
+                            <input type="checkbox" id="stvp-flip">
+                            <label class="stvp-toggle" for="stvp-flip"></label>
+                        </div>
+                        <div class="stvp-row">
+                            <label>투명도</label>
+                            <input type="range" id="stvp-opacity" min="10" max="100" step="5">
+                            <span id="stvp-opacity-label">100</span>%
+                        </div>
+
+                        <div class="stvp-subsection">
+                            <label class="stvp-subsection-title">기분별 이미지</label>
+                            <div class="stvp-info" style="margin-top:6px;">
+                                <small><i class="fa-solid fa-lightbulb"></i> 기분별 이미지를 업로드하세요 (GIF 가능). 비어있으면 기본 이미지 사용</small>
+                            </div>
+                            <div class="stvp-info" style="margin-top:2px;">
+                                <small><i class="fa-solid fa-triangle-exclamation" style="color:#e8a735;"></i> <b>URL 등록 권장!</b> 직접 업로드 시 Base64 변환으로 화질 저하가 있을 수 있습니다. 외부 이미지 호스팅(postimages 등) URL 사용을 추천합니다.</small>
+                            </div>
+                            <div class="stvp-sprite-grid">
+                                ${spriteUploadsHtml}
+                                <div class="stvp-sprite-item" id="stvp-walk-sprite-item">
+                                    <span class="stvp-sprite-label">걷기</span>
+                                    <div class="stvp-sprite-preview" id="stvp-walk-preview">
+                                        <span class="stvp-sprite-placeholder">+</span>
+                                    </div>
+                                    <input type="file" id="stvp-walk-sprite-file" accept="image/*,.gif,.webp" style="display:none;">
+                                    <div class="stvp-sprite-buttons">
+                                        <button class="stvp-sprite-url menu_button" id="stvp-walk-sprite-url" title="URL로 등록"><i class="fa-solid fa-link"></i></button>
+                                        <button class="stvp-sprite-clear menu_button" id="stvp-walk-sprite-clear" style="display:none;">✕</button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <!-- ━━━ 위치 ━━━ -->
-                <div class="stvp-section">
-                    <h5><i class="fa-solid fa-location-dot"></i> 위치</h5>
-                    <div class="stvp-row">
-                        <label>위치 프리셋</label>
-                        <select id="stvp-position" class="text_pole">
-                            ${positionPresetOptions}
-                        </select>
-                    </div>
-                    <div class="stvp-row">
-                        <label>드래그 이동</label>
-                        <input type="checkbox" id="stvp-draggable">
-                        <label class="stvp-toggle" for="stvp-draggable"></label>
-                    </div>
-                    
-                    <hr class="stvp-divider">
-                    <label class="stvp-subsection-title"><i class="fa-solid fa-person-walking"></i> 걷기</label>
-                    <div class="stvp-info" style="margin-bottom:4px;">
-                        <small><i class="fa-solid fa-lightbulb"></i> 펫이 주변을 천천히 돌아다닙니다. 잠자기/드래그 중에는 멈춥니다</small>
-                    </div>
-                    <div class="stvp-row" style="margin-top:4px;">
-                        <label>걷기 사용</label>
-                        <input type="checkbox" id="stvp-walk-enabled">
-                        <label class="stvp-toggle" for="stvp-walk-enabled"></label>
-                    </div>
-
-                </div>
-
-                <!-- ━━━ 말풍선 ━━━ -->
-                <div class="stvp-section">
-                    <h5><i class="fa-solid fa-comment"></i> 말풍선</h5>
-                    <div class="stvp-row">
-                        <label>활성화</label>
-                        <input type="checkbox" id="stvp-bubble-enabled">
-                        <label class="stvp-toggle" for="stvp-bubble-enabled"></label>
-                    </div>
-                    <div class="stvp-row">
-                        <label>디자인</label>
-                        <select id="stvp-bubble-design" class="text_pole">
-                            ${designOptions}
-                        </select>
-                    </div>
-                    <div class="stvp-row">
-                        <label>폰트</label>
-                        <select id="stvp-bubble-font" class="text_pole">
-                            ${fontOptions}
-                        </select>
-                    </div>
-                    <div class="stvp-row">
-                        <label>최대 너비</label>
-                        <input type="range" id="stvp-bubble-max-width" min="120" max="600" step="10">
-                        <span id="stvp-bubble-max-width-label">360</span>px
-                    </div>
-                    <div class="stvp-row">
-                        <label>표시 시간 (ms)</label>
-                        <input type="number" id="stvp-bubble-duration" class="text_pole" min="1000" max="30000" step="500">
-                    </div>
-                    <hr class="stvp-divider">
-                    <label class="stvp-subsection-title"><i class="fa-solid fa-droplet"></i> 색상</label>
-                    <div class="stvp-row" style="margin-top:6px;">
-                        <label>배경색</label>
-                        <input type="color" id="stvp-bubble-bg" value="#ffffff">
-                    </div>
-                    <div class="stvp-row">
-                        <label>글자색</label>
-                        <input type="color" id="stvp-bubble-text-color" value="#333333">
-                    </div>
-                    <div class="stvp-row">
-                        <label>강조색</label>
-                        <input type="color" id="stvp-bubble-accent-color" value="#7c9bff">
-                    </div>
-                    <div class="stvp-info" style="margin-bottom:0;">
-                        <small><i class="fa-solid fa-palette"></i> 강조색은 게이지바, 버튼, 입력창에 적용됩니다</small>
-                    </div>
-                    <hr class="stvp-divider">
-                    <label class="stvp-subsection-title"><i class="fa-solid fa-comment-slash"></i> 폴백 대사</label>
-                    <div class="stvp-row" style="margin-top:6px;">
-                        <label>응답 실패 시 대사</label>
-                        <input type="text" id="stvp-fallback-no-response" class="text_pole" placeholder="...뭐라고?">
-                    </div>
-                    <div class="stvp-row">
-                        <label>API 오류 시 대사</label>
-                        <input type="text" id="stvp-fallback-api-error" class="text_pole" placeholder="...잘 안 들렸어.">
-                    </div>
-                </div>
-
-                <!-- ━━━ 커스텀 대사 ━━━ -->
-                <div class="stvp-section">
-                    <h5><i class="fa-solid fa-quote-left"></i> 커스텀 대사</h5>
-                    <div class="stvp-info">
-                        <small><i class="fa-solid fa-lightbulb"></i> 비어있으면 기본 대사를 사용합니다. 줄바꿈으로 여러 대사 입력</small>
-                    </div>
-                    <div class="stvp-speeches-container">
-                        ${speechSettingsHtml}
-                    </div>
-                </div>
-
-                <!-- ━━━ AI 반응 ━━━ -->
-                <div class="stvp-section">
-                    <h5><i class="fa-solid fa-robot"></i> AI 반응</h5>
-                    <div class="stvp-row">
-                        <label>AI 반응 사용</label>
-                        <input type="checkbox" id="stvp-ai-enabled">
-                        <label class="stvp-toggle" for="stvp-ai-enabled"></label>
-                    </div>
-                    <div class="stvp-info" style="margin-bottom:0;">
-                        <small><i class="fa-solid fa-triangle-exclamation"></i> ON 시 AI 응답마다 펫이 채팅을 읽고 반응합니다 (추가 API 호출 발생)</small>
-                    </div>
-                    
-                    <div class="stvp-row" style="margin-top:8px;">
-                        <label>반응 간격</label>
-                        <input type="range" id="stvp-reaction-interval" min="1" max="10" step="1">
-                        <span id="stvp-reaction-interval-label">3</span>번째 메시지마다
-                    </div>
-
-                    <hr class="stvp-divider">
-                    <label class="stvp-subsection-title"><i class="fa-solid fa-comment-dots"></i> 자발적 말걸기</label>
-                    <div class="stvp-info" style="margin-bottom:4px;">
-                        <small><i class="fa-solid fa-lightbulb"></i> 펫이 설정된 간격마다 스스로 말을 겁니다 (AI 반응 ON 필요)</small>
-                    </div>
-                    <div class="stvp-row" style="margin-top:4px;">
-                        <label>자발적 말걸기</label>
-                        <input type="checkbox" id="stvp-spontaneous-enabled">
-                        <label class="stvp-toggle" for="stvp-spontaneous-enabled"></label>
-                    </div>
-                    <div id="stvp-spontaneous-settings">
+                    <!-- 위치 -->
+                    <div class="stvp-section">
+                        <h5><i class="fa-solid fa-location-dot"></i> 위치</h5>
                         <div class="stvp-row">
-                            <label>최소 간격</label>
-                            <input type="range" id="stvp-spontaneous-min" min="5" max="60" step="5">
-                            <span id="stvp-spontaneous-min-label">15</span>분
-                        </div>
-                        <div class="stvp-row">
-                            <label>최대 간격</label>
-                            <input type="range" id="stvp-spontaneous-max" min="10" max="120" step="5">
-                            <span id="stvp-spontaneous-max-label">30</span>분
-                        </div>
-                    </div>
-
-                    <hr class="stvp-divider">
-                    <div id="stvp-ai-settings" class="stvp-subsection">
-                        <label class="stvp-subsection-title">채팅 반응 설정</label>
-                        <div class="stvp-row" style="margin-top:8px;">
-                            <label>반응 모드</label>
-                            <select id="stvp-reaction-mode" class="text_pole">
-                                <option value="observer">관전자 (비평/감상)</option>
-                                <option value="character">속마음 (내면 독백)</option>
+                            <label>위치 프리셋</label>
+                            <select id="stvp-position" class="text_pole">
+                                ${positionPresetOptions}
                             </select>
+                        </div>
+                        <div class="stvp-row">
+                            <label>드래그 이동</label>
+                            <input type="checkbox" id="stvp-draggable">
+                            <label class="stvp-toggle" for="stvp-draggable"></label>
+                        </div>
+                        
+                        <hr class="stvp-divider">
+                        <label class="stvp-subsection-title"><i class="fa-solid fa-person-walking"></i> 걷기</label>
+                        <div class="stvp-info" style="margin-bottom:4px;">
+                            <small><i class="fa-solid fa-lightbulb"></i> 펫이 주변을 천천히 돌아다닙니다. 잠자기/드래그 중에는 멈춥니다</small>
+                        </div>
+                        <div class="stvp-row" style="margin-top:4px;">
+                            <label>걷기 사용</label>
+                            <input type="checkbox" id="stvp-walk-enabled">
+                            <label class="stvp-toggle" for="stvp-walk-enabled"></label>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- ══════ 탭3: 대화 ══════ -->
+                <div class="stvp-tab-content" data-tab="chat">
+
+                    <!-- 말풍선 -->
+                    <div class="stvp-section">
+                        <h5><i class="fa-solid fa-comment"></i> 말풍선</h5>
+                        <div class="stvp-row">
+                            <label>활성화</label>
+                            <input type="checkbox" id="stvp-bubble-enabled">
+                            <label class="stvp-toggle" for="stvp-bubble-enabled"></label>
+                        </div>
+                        <div class="stvp-row">
+                            <label>디자인</label>
+                            <select id="stvp-bubble-design" class="text_pole">
+                                ${designOptions}
+                            </select>
+                        </div>
+                        <div class="stvp-row">
+                            <label>폰트</label>
+                            <select id="stvp-bubble-font" class="text_pole">
+                                ${fontOptions}
+                            </select>
+                        </div>
+                        <div class="stvp-row">
+                            <label>최대 너비</label>
+                            <input type="range" id="stvp-bubble-max-width" min="120" max="600" step="10">
+                            <span id="stvp-bubble-max-width-label">360</span>px
+                        </div>
+                        <div class="stvp-row">
+                            <label>표시 시간 (ms)</label>
+                            <input type="number" id="stvp-bubble-duration" class="text_pole" min="1000" max="30000" step="500">
+                        </div>
+                        <hr class="stvp-divider">
+                        <label class="stvp-subsection-title"><i class="fa-solid fa-droplet"></i> 색상</label>
+                        <div class="stvp-row" style="margin-top:6px;">
+                            <label>배경색</label>
+                            <input type="color" id="stvp-bubble-bg" value="#ffffff">
+                        </div>
+                        <div class="stvp-row">
+                            <label>글자색</label>
+                            <input type="color" id="stvp-bubble-text-color" value="#333333">
+                        </div>
+                        <div class="stvp-row">
+                            <label>강조색</label>
+                            <input type="color" id="stvp-bubble-accent-color" value="#7c9bff">
                         </div>
                         <div class="stvp-info" style="margin-bottom:0;">
-                            <small><i class="fa-solid fa-eye"></i> 관전자: 채팅을 옆에서 보며 반응 | <i class="fa-solid fa-cloud"></i> 속마음: 캐릭터의 진짜 속마음</small>
+                            <small><i class="fa-solid fa-palette"></i> 강조색은 게이지바, 버튼, 입력창에 적용됩니다</small>
                         </div>
-
                         <hr class="stvp-divider">
-                        <label class="stvp-subsection-title">프롬프트에 포함할 정보</label>
-                        <div class="stvp-row" style="margin-top:8px;">
-                            <label>이전 메시지 수</label>
-                            <input type="range" id="stvp-history-count" min="1" max="20" step="1">
-                            <span id="stvp-history-count-label">6</span>개
+                        <label class="stvp-subsection-title"><i class="fa-solid fa-comment-slash"></i> 폴백 대사</label>
+                        <div class="stvp-row" style="margin-top:6px;">
+                            <label>응답 실패 시 대사</label>
+                            <input type="text" id="stvp-fallback-no-response" class="text_pole" placeholder="...뭐라고?">
                         </div>
                         <div class="stvp-row">
-                            <label>월드인포 포함</label>
-                            <input type="checkbox" id="stvp-include-worldinfo">
-                            <label class="stvp-toggle" for="stvp-include-worldinfo"></label>
+                            <label>API 오류 시 대사</label>
+                            <input type="text" id="stvp-fallback-api-error" class="text_pole" placeholder="...잘 안 들렸어.">
+                        </div>
+                    </div>
+
+                    <!-- 커스텀 대사 -->
+                    <div class="stvp-section">
+                        <h5><i class="fa-solid fa-quote-left"></i> 커스텀 대사</h5>
+                        <div class="stvp-info">
+                            <small><i class="fa-solid fa-lightbulb"></i> 비어있으면 기본 대사를 사용합니다. 줄바꿈으로 여러 대사 입력</small>
+                        </div>
+                        <div class="stvp-speeches-container">
+                            ${speechSettingsHtml}
+                        </div>
+                    </div>
+
+                    <!-- AI 반응 -->
+                    <div class="stvp-section">
+                        <h5><i class="fa-solid fa-robot"></i> AI 반응</h5>
+                        <div class="stvp-row">
+                            <label>AI 반응 사용</label>
+                            <input type="checkbox" id="stvp-ai-enabled">
+                            <label class="stvp-toggle" for="stvp-ai-enabled"></label>
+                        </div>
+                        <div class="stvp-info" style="margin-bottom:0;">
+                            <small><i class="fa-solid fa-triangle-exclamation"></i> ON 시 AI 응답마다 펫이 채팅을 읽고 반응합니다 (추가 API 호출 발생)</small>
+                        </div>
+                        
+                        <div class="stvp-row" style="margin-top:8px;">
+                            <label>반응 간격</label>
+                            <input type="range" id="stvp-reaction-interval" min="1" max="10" step="1">
+                            <span id="stvp-reaction-interval-label">3</span>번째 메시지마다
                         </div>
 
                         <hr class="stvp-divider">
-                        <label class="stvp-subsection-title">API 연결</label>
-                        <div class="stvp-row" style="margin-top:8px;">
-                            <label>Connection Manager</label>
-                            <input type="checkbox" id="stvp-use-cm">
-                            <label class="stvp-toggle" for="stvp-use-cm"></label>
+                        <div id="stvp-ai-settings" class="stvp-subsection">
+                            <label class="stvp-subsection-title">채팅 반응 설정</label>
+                            <div class="stvp-row" style="margin-top:8px;">
+                                <label>반응 모드</label>
+                                <select id="stvp-reaction-mode" class="text_pole">
+                                    <option value="observer">관전자 (비평/감상)</option>
+                                    <option value="character">속마음 (내면 독백)</option>
+                                </select>
+                            </div>
+                            <div class="stvp-info" style="margin-bottom:0;">
+                                <small><i class="fa-solid fa-eye"></i> 관전자: 채팅을 옆에서 보며 반응 | <i class="fa-solid fa-cloud"></i> 속마음: 캐릭터의 진짜 속마음</small>
+                            </div>
+
+                            <hr class="stvp-divider">
+                            <label class="stvp-subsection-title">프롬프트에 포함할 정보</label>
+                            <div class="stvp-row" style="margin-top:8px;">
+                                <label>이전 메시지 수</label>
+                                <input type="range" id="stvp-history-count" min="1" max="20" step="1">
+                                <span id="stvp-history-count-label">6</span>개
+                            </div>
+                            <div class="stvp-row">
+                                <label>월드인포 포함</label>
+                                <input type="checkbox" id="stvp-include-worldinfo">
+                                <label class="stvp-toggle" for="stvp-include-worldinfo"></label>
+                            </div>
+
+                            <hr class="stvp-divider">
+                            <label class="stvp-subsection-title">API 연결</label>
+                            <div class="stvp-row" style="margin-top:8px;">
+                                <label>Connection Manager</label>
+                                <input type="checkbox" id="stvp-use-cm">
+                                <label class="stvp-toggle" for="stvp-use-cm"></label>
+                            </div>
+                            <div class="stvp-row" id="stvp-cm-profile-row">
+                                <label>Connection Profile</label>
+                                <select id="stvp-cm-profile" class="text_pole">
+                                    ${connectionProfileOptions}
+                                </select>
+                            </div>
+                            <div class="stvp-row">
+                                <label>최대 토큰</label>
+                                <input type="number" id="stvp-max-tokens" class="text_pole" min="50" max="200" step="10">
+                            </div>
                         </div>
-                        <div class="stvp-row" id="stvp-cm-profile-row">
-                            <label>Connection Profile</label>
-                            <select id="stvp-cm-profile" class="text_pole">
-                                ${connectionProfileOptions}
+                    </div>
+
+                </div>
+
+                <!-- ══════ 탭4: 로그 ══════ -->
+                <div class="stvp-tab-content" data-tab="log">
+
+                    <div class="stvp-section">
+                        <h5><i class="fa-solid fa-clipboard-list"></i> 대화 로그</h5>
+                        <div class="stvp-row">
+                            <label>로그 필터</label>
+                            <select id="stvp-log-filter" class="text_pole">
+                                <option value="all">전체</option>
+                                <option value="direct">직접 대화만</option>
+                                <option value="chat">현재 채팅방 반응만</option>
                             </select>
                         </div>
-                        <div class="stvp-row">
-                            <label>최대 토큰</label>
-                            <input type="number" id="stvp-max-tokens" class="text_pole" min="50" max="200" step="10">
+                        <hr class="stvp-divider">
+                        <div id="stvp-log-viewer" class="stvp-log-viewer">
+                            <div class="stvp-log-empty"><i class="fa-solid fa-inbox"></i> 로그가 없습니다.</div>
+                        </div>
+                        <div class="stvp-log-pagination" id="stvp-log-pagination" style="display:none;">
+                            <button class="menu_button stvp-log-page-btn" id="stvp-log-prev" title="이전 페이지"><i class="fa-solid fa-chevron-left"></i></button>
+                            <span id="stvp-log-page-info">1 / 1</span>
+                            <button class="menu_button stvp-log-page-btn" id="stvp-log-next" title="다음 페이지"><i class="fa-solid fa-chevron-right"></i></button>
+                        </div>
+                        <hr class="stvp-divider">
+                        <label class="stvp-subsection-title"><i class="fa-solid fa-broom"></i> 로그 관리</label>
+                        <div class="stvp-row stvp-log-buttons" style="margin-top:6px;">
+                            <button class="menu_button" id="stvp-log-refresh" title="새로고침"><i class="fa-solid fa-arrows-rotate"></i> 새로고침</button>
+                            <button class="menu_button" id="stvp-log-clear-direct" title="직접 대화 로그 초기화"><i class="fa-solid fa-trash-can"></i> 직접 대화</button>
+                            <button class="menu_button" id="stvp-log-clear-chat" title="현재 채팅방 로그 초기화"><i class="fa-solid fa-trash-can"></i> 채팅방</button>
+                            <button class="menu_button" id="stvp-log-clear-all" title="모든 로그 초기화"><i class="fa-solid fa-trash-can"></i> 전체</button>
+                        </div>
+                        <div class="stvp-info" style="margin-top:6px; margin-bottom:0;">
+                            <small><i class="fa-solid fa-circle-info"></i> 직접 대화는 펫별로 저장됩니다 | 채팅방 반응은 해당 채팅방에서만 표시</small>
                         </div>
                     </div>
+
                 </div>
 
-                <!-- ━━━ 대화 로그 ━━━ -->
-                <div class="stvp-section">
-                    <h5><i class="fa-solid fa-clipboard-list"></i> 대화 로그</h5>
-                    <div class="stvp-row">
-                        <label>로그 필터</label>
-                        <select id="stvp-log-filter" class="text_pole">
-                            <option value="all">전체</option>
-                            <option value="direct">직접 대화만</option>
-                            <option value="chat">현재 채팅방 반응만</option>
-                        </select>
-                    </div>
-                    <hr class="stvp-divider">
-                    <div id="stvp-log-viewer" class="stvp-log-viewer">
-                        <div class="stvp-log-empty"><i class="fa-solid fa-inbox"></i> 로그가 없습니다.</div>
-                    </div>
-                    <div class="stvp-log-pagination" id="stvp-log-pagination" style="display:none;">
-                        <button class="menu_button stvp-log-page-btn" id="stvp-log-prev" title="이전 페이지"><i class="fa-solid fa-chevron-left"></i></button>
-                        <span id="stvp-log-page-info">1 / 1</span>
-                        <button class="menu_button stvp-log-page-btn" id="stvp-log-next" title="다음 페이지"><i class="fa-solid fa-chevron-right"></i></button>
-                    </div>
-                    <hr class="stvp-divider">
-                    <label class="stvp-subsection-title"><i class="fa-solid fa-broom"></i> 로그 관리</label>
-                    <div class="stvp-row stvp-log-buttons" style="margin-top:6px;">
-                        <button class="menu_button" id="stvp-log-refresh" title="새로고침"><i class="fa-solid fa-arrows-rotate"></i> 새로고침</button>
-                        <button class="menu_button" id="stvp-log-clear-direct" title="직접 대화 로그 초기화"><i class="fa-solid fa-trash-can"></i> 직접 대화</button>
-                        <button class="menu_button" id="stvp-log-clear-chat" title="현재 채팅방 로그 초기화"><i class="fa-solid fa-trash-can"></i> 채팅방</button>
-                        <button class="menu_button" id="stvp-log-clear-all" title="모든 로그 초기화"><i class="fa-solid fa-trash-can"></i> 전체</button>
-                    </div>
-                    <div class="stvp-info" style="margin-top:6px; margin-bottom:0;">
-                        <small><i class="fa-solid fa-circle-info"></i> 직접 대화는 펫별로 저장됩니다 | 채팅방 반응은 해당 채팅방에서만 표시</small>
-                    </div>
-                </div>
-
-                <!-- 모바일 상태 -->
+                <!-- 모바일 상태 (탭 밖) -->
                 <div class="stvp-section" id="stvp-mobile-notice" style="display:none;">
                     <div class="stvp-info" style="background: rgba(255, 100, 100, 0.15); margin-bottom:0;">
                         <small><i class="fa-solid fa-mobile-screen"></i> 모바일(스마트폰) 환경이 감지되어 펫이 비활성화되었습니다. PC/태블릿에서 자동으로 활성화됩니다.</small>
                     </div>
                 </div>
 
-                <!-- 전체 초기화 -->
+                <!-- 전체 초기화 (탭 밖) -->
                 <div class="stvp-section" style="margin-bottom:0;">
                     <div class="stvp-row" style="margin-bottom:0;">
                         <button class="menu_button" id="stvp-reset-all" style="width:100%; background: rgba(255, 80, 80, 0.12); border-color: rgba(255, 80, 80, 0.25); font-size:0.85em;" title="확장의 모든 설정을 초기화합니다"><i class="fa-solid fa-triangle-exclamation"></i> 모든 설정 초기화</button>
@@ -467,6 +484,15 @@ function createSpeechSettingHtml(moodId, label) {
  * UI 이벤트 바인딩
  */
 function bindUIEvents() {
+    // === 탭 전환 ===
+    $(".stvp-tab-btn").on("click", function() {
+        const tab = $(this).data("tab");
+        $(".stvp-tab-btn").removeClass("active");
+        $(this).addClass("active");
+        $(".stvp-tab-content").removeClass("active");
+        $(`.stvp-tab-content[data-tab="${tab}"]`).addClass("active");
+    });
+
     // 활성화 토글
     $("#stvp-enabled").on("change", function() {
         state.settings.enabled = this.checked;
@@ -601,6 +627,17 @@ function bindUIEvents() {
         state.settings.appearance.flipHorizontal = this.checked;
         saveSettings();
         updatePetSprite();
+    });
+
+    // 투명도 변경
+    $("#stvp-opacity").on("input", function() {
+        let opacity = parseInt(this.value);
+        if (isNaN(opacity) || opacity < 10) opacity = 10;
+        if (opacity > 100) opacity = 100;
+        state.settings.appearance.opacity = opacity;
+        $("#stvp-opacity-label").text(opacity);
+        updatePetOpacity();
+        saveSettings();
     });
 
     // 스프라이트 업로드 (걷기 이미지는 별도 핸들러)
@@ -786,57 +823,6 @@ function bindUIEvents() {
     }).on("change", function() {
         state.settings.reactions.reactionInterval = parseInt(this.value) || 3;
         saveSettings();
-    });
-
-    // === 자발적 말걸기 ===
-    $("#stvp-spontaneous-enabled").on("change", function() {
-        if (!state.settings.reactions.spontaneous) {
-            state.settings.reactions.spontaneous = { enabled: false, intervalMin: 15, intervalMax: 30 };
-        }
-        state.settings.reactions.spontaneous.enabled = this.checked;
-        saveSettings();
-        if (this.checked) {
-            startSpontaneousTimer();
-        } else {
-            stopSpontaneousTimer();
-        }
-        toggleSpontaneousSettings(this.checked);
-    });
-
-    $("#stvp-spontaneous-min").on("input", function() {
-        $("#stvp-spontaneous-min-label").text(this.value);
-    }).on("change", function() {
-        const val = parseInt(this.value) || 15;
-        if (!state.settings.reactions.spontaneous) {
-            state.settings.reactions.spontaneous = { enabled: false, intervalMin: 15, intervalMax: 30 };
-        }
-        state.settings.reactions.spontaneous.intervalMin = val;
-        // 최소가 최대보다 크면 최대도 맞춤
-        if (val > state.settings.reactions.spontaneous.intervalMax) {
-            state.settings.reactions.spontaneous.intervalMax = val;
-            $("#stvp-spontaneous-max").val(val);
-            $("#stvp-spontaneous-max-label").text(val);
-        }
-        saveSettings();
-        if (state.settings.reactions.spontaneous.enabled) startSpontaneousTimer();
-    });
-
-    $("#stvp-spontaneous-max").on("input", function() {
-        $("#stvp-spontaneous-max-label").text(this.value);
-    }).on("change", function() {
-        const val = parseInt(this.value) || 30;
-        if (!state.settings.reactions.spontaneous) {
-            state.settings.reactions.spontaneous = { enabled: false, intervalMin: 15, intervalMax: 30 };
-        }
-        state.settings.reactions.spontaneous.intervalMax = val;
-        // 최대가 최소보다 작으면 최소도 맞춤
-        if (val < state.settings.reactions.spontaneous.intervalMin) {
-            state.settings.reactions.spontaneous.intervalMin = val;
-            $("#stvp-spontaneous-min").val(val);
-            $("#stvp-spontaneous-min-label").text(val);
-        }
-        saveSettings();
-        if (state.settings.reactions.spontaneous.enabled) startSpontaneousTimer();
     });
 
     $("#stvp-pet-name").on("change", function() {
@@ -1132,7 +1118,6 @@ function getTriggerLabel(trigger) {
         longAbsence: "오랜만에",
         feeding: "밥주기",
         hungry: "배고픔",
-        spontaneous: "자발적 말걸기",
     };
     return labels[trigger] || trigger;
 }
@@ -1166,6 +1151,8 @@ function updateUIValues() {
     // 외형
     $("#stvp-size").val(s.appearance.size);
     $("#stvp-flip").prop("checked", s.appearance.flipHorizontal);
+    $("#stvp-opacity").val(s.appearance.opacity ?? 100);
+    $("#stvp-opacity-label").text(s.appearance.opacity ?? 100);
     
     // 커스텀 스프라이트 미리보기
     Object.entries(s.appearance.customSprites || {}).forEach(([moodId, data]) => {
@@ -1203,15 +1190,6 @@ function updateUIValues() {
     $("#stvp-ai-enabled").prop("checked", s.personality.enabled);
     $("#stvp-reaction-interval").val(s.reactions.reactionInterval || 3);
     $("#stvp-reaction-interval-label").text(s.reactions.reactionInterval || 3);
-    
-    // 자발적 말걸기
-    const spon = s.reactions.spontaneous || { enabled: false, intervalMin: 15, intervalMax: 30 };
-    $("#stvp-spontaneous-enabled").prop("checked", spon.enabled);
-    $("#stvp-spontaneous-min").val(spon.intervalMin || 15);
-    $("#stvp-spontaneous-min-label").text(spon.intervalMin || 15);
-    $("#stvp-spontaneous-max").val(spon.intervalMax || 30);
-    $("#stvp-spontaneous-max-label").text(spon.intervalMax || 30);
-    toggleSpontaneousSettings(spon.enabled);
     
     $("#stvp-pet-name").val(s.personality.name);
     $("#stvp-personality-prompt").val(s.personality.prompt);
@@ -1276,17 +1254,6 @@ function toggleAISettings(show) {
         $("#stvp-ai-settings").slideDown(200);
     } else {
         $("#stvp-ai-settings").slideUp(200);
-    }
-}
-
-/**
- * 자발적 말걸기 설정 토글
- */
-function toggleSpontaneousSettings(show) {
-    if (show) {
-        $("#stvp-spontaneous-settings").slideDown(200);
-    } else {
-        $("#stvp-spontaneous-settings").slideUp(200);
     }
 }
 
