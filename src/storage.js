@@ -145,7 +145,7 @@ export function savePreset(name) {
         name: name,
         createdAt: new Date().toISOString(),
         appearance: structuredClone(state.settings.appearance),
-        personality: stripUserInfo(state.settings.personality),
+        personality: structuredClone(state.settings.personality),
         customSpeeches: structuredClone(state.settings.customSpeeches),
         fallbackMessages: structuredClone(state.settings.fallbackMessages || {}),
         walk: structuredClone(state.settings.walk || { enabled: false, walkSprite: null }),
@@ -175,13 +175,18 @@ export function loadPreset(presetId) {
         return false;
     }
     
-    // 외형, 성격, 대사 적용 (유저 정보는 현재 값 유지)
+    // 외형, 성격, 대사 적용 (유저 정보도 프리셋별로 적용)
     state.settings.appearance = structuredClone(preset.appearance);
     const currentOwnerName = state.settings.personality.ownerName || "";
     const currentOwnerPersona = state.settings.personality.ownerPersona || "";
     state.settings.personality = structuredClone(preset.personality);
-    state.settings.personality.ownerName = state.settings.personality.ownerName || currentOwnerName;
-    state.settings.personality.ownerPersona = state.settings.personality.ownerPersona || currentOwnerPersona;
+    // 구버전 프리셋(유저 정보 미포함)이면 현재 유저 정보 유지
+    if (!('ownerName' in preset.personality)) {
+        state.settings.personality.ownerName = currentOwnerName;
+    }
+    if (!('ownerPersona' in preset.personality)) {
+        state.settings.personality.ownerPersona = currentOwnerPersona;
+    }
     state.settings.customSpeeches = structuredClone(preset.customSpeeches);
     if (preset.fallbackMessages) {
         state.settings.fallbackMessages = structuredClone(preset.fallbackMessages);
@@ -239,7 +244,7 @@ export function updatePreset(presetId) {
     }
     
     preset.appearance = structuredClone(state.settings.appearance);
-    preset.personality = stripUserInfo(state.settings.personality);
+    preset.personality = structuredClone(state.settings.personality);
     preset.customSpeeches = structuredClone(state.settings.customSpeeches);
     preset.fallbackMessages = structuredClone(state.settings.fallbackMessages || {});
     preset.walk = structuredClone(state.settings.walk || { enabled: false, walkSprite: null });
