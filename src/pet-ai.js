@@ -440,19 +440,19 @@ I understand. Dialogue with mood tag:`;
         log(`Talk response: [${result.mood}] ${result.text}`);
         
         if (result.text) {
-            setState(result.mood, 5000);
-            showSpeechBubble(result.text, 5000, true);
+            setState(result.mood, state.settings.speechBubble.duration);
+            showSpeechBubble(result.text, null, true);
             saveDirectLog(userText, result.text, result.mood);
         } else {
             const msg = state.settings.fallbackMessages?.noResponse || "...뭐라고?";
-            setState(PET_STATES.HAPPY, 2000);
-            showSpeechBubble(msg, 2000, true);
+            setState(PET_STATES.HAPPY, state.settings.speechBubble.duration);
+            showSpeechBubble(msg, null, true);
         }
     } catch (error) {
         logError("talkToPet error:", error);
         const msg = state.settings.fallbackMessages?.apiError || "...잘 안 들렸어.";
-        setState(PET_STATES.HAPPY, 2000);
-        showSpeechBubble(msg, 2000, true);
+        setState(PET_STATES.HAPPY, state.settings.speechBubble.duration);
+        showSpeechBubble(msg, null, true);
     } finally {
         state.isPetGenerating = false;
     }
