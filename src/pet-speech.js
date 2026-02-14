@@ -5,84 +5,126 @@
 import { state, log } from "./state.js";
 import { DEFAULT_SPEECHES } from "./constants.js";
 
+/** 말풍선 z-index 카운터: 나중에 뜬 말풍선이 항상 위에 표시되도록 */
+let bubbleZCounter = 9999;
+
 /**
  * 말풍선 표시
  * @param {string} text - 표시할 텍스트
  * @param {number|null} duration - 표시 시간 (ms), null이면 설정값 사용
  * @param {boolean} priority - true면 우선순위 말풍선 (AI 응답), 일반 대사로 덮어쓰기 불가
  */
-export function showSpeechBubble(text, duration = null, priority = false) {
-    if (!state.settings.speechBubble.enabled) return;
-    if (!state.bubbleElement) return;
+export function showSpeechBubble(text, duration = null, priority = false, petId = "primary") {
+    const isSecond = petId === "secondary";
+    const speechBubbleSettings = isSecond
+        ? (state.settings.multiPet?.secondPetData?.speechBubble || state.settings.speechBubble)
+        : state.settings.speechBubble;
     
-    const bubbleText = state.bubbleElement.querySelector(".st-pet-bubble-text");
+    // 공통 설정: 말풍선 ON/OFF는 항상 글로벌 설정 사용
+    if (!state.settings.speechBubble.enabled) return;
+    
+    const bubbleEl = isSecond ? state.secondPet.bubbleElement : state.bubbleElement;
+    if (!bubbleEl) return;
+    
+    const bubbleText = bubbleEl.querySelector(".st-pet-bubble-text");
     if (!bubbleText) return;
     
     // 우선순위 말풍선이 표시 중이면 일반 대사는 무시
-    if (state.isPrioritySpeech && !priority) {
-        log(`Speech blocked (priority active): "${text}"`);
+    const isPriorityActive = isSecond ? state.secondPet.isPrioritySpeech : state.isPrioritySpeech;
+    if (isPriorityActive && !priority) {
+        log(`Speech [${petId}] blocked (priority active): "${text}"`);
         return;
     }
     
     // 기존 타이머 클리어
-    if (state.bubbleTimer) {
-        clearTimeout(state.bubbleTimer);
+    const existingTimer = isSecond ? state.secondPet.bubbleTimer : state.bubbleTimer;
+    if (existingTimer) {
+        clearTimeout(existingTimer);
     }
     
     // 우선순위 플래그 설정
-    state.isPrioritySpeech = priority;
+    if (isSecond) {
+        state.secondPet.isPrioritySpeech = priority;
+    } else {
+        state.isPrioritySpeech = priority;
+    }
     
     // 스타일 적용
-    applyBubbleStyle();
+    applyBubbleStyle(petId);
     
     // 텍스트 설정
     bubbleText.textContent = text;
     
     // 표시
-    state.bubbleElement.style.display = "block";
-    state.bubbleElement.classList.add("show");
+    bubbleEl.style.display = "block";
+    bubbleEl.classList.add("show");
+    
+    // 늦게 뜬 말풍선이 위에 오도록 컨테이너 z-index 갱신
+    bubbleZCounter++;
+    const container = isSecond
+        ? document.getElementById("saipet-container-2")
+        : document.getElementById("saipet-container");
+    if (container) container.style.zIndex = bubbleZCounter;
     
     // 화면 밖 잘림 보정
-    adjustBubblePosition();
+    adjustBubblePosition(petId);
     
-    // 자동 숨김
+    // 자동 숨김 — 공통 설정: 표시 시간은 글로벌 설정 사용
     const hideAfter = duration || state.settings.speechBubble.duration;
-    state.bubbleTimer = setTimeout(() => {
-        hideSpeechBubble();
+    const newTimer = setTimeout(() => {
+        hideSpeechBubble(petId);
     }, hideAfter);
     
-    log(`Speech: "${text}"`);
+    if (isSecond) {
+        state.secondPet.bubbleTimer = newTimer;
+    } else {
+        state.bubbleTimer = newTimer;
+    }
+    
+    log(`Speech [${petId}]: "${text}"`);
 }
 
 /**
  * 말풍선 숨기기
  */
-export function hideSpeechBubble() {
-    if (!state.bubbleElement) return;
+export function hideSpeechBubble(petId = "primary") {
+    const isSecond = petId === "secondary";
+    const bubbleEl = isSecond ? state.secondPet.bubbleElement : state.bubbleElement;
+    if (!bubbleEl) return;
     
-    state.isPrioritySpeech = false;
-    state.bubbleElement.classList.remove("show");
+    if (isSecond) {
+        state.secondPet.isPrioritySpeech = false;
+    } else {
+        state.isPrioritySpeech = false;
+    }
+    bubbleEl.classList.remove("show");
     
     setTimeout(() => {
-        if (state.bubbleElement) {
-            state.bubbleElement.style.display = "none";
-        }
+        const el = isSecond ? state.secondPet.bubbleElement : state.bubbleElement;
+        if (el) el.style.display = "none";
     }, 200);
     
-    if (state.bubbleTimer) {
-        clearTimeout(state.bubbleTimer);
-        state.bubbleTimer = null;
+    const timer = isSecond ? state.secondPet.bubbleTimer : state.bubbleTimer;
+    if (timer) {
+        clearTimeout(timer);
+        if (isSecond) {
+            state.secondPet.bubbleTimer = null;
+        } else {
+            state.bubbleTimer = null;
+        }
     }
 }
 
 /**
  * 말풍선 위치 보정 (화면 밖 잘림 방지)
  */
-function adjustBubblePosition() {
-    if (!state.bubbleElement) return;
+function adjustBubblePosition(petId = "primary") {
+    const isSecond = petId === "secondary";
+    const bubble = isSecond ? state.secondPet.bubbleElement : state.bubbleElement;
+    if (!bubble) return;
     
-    const bubble = state.bubbleElement;
-    const container = document.getElementById("saipet-container");
+    const containerId = isSecond ? "saipet-container-2" : "saipet-container";
+    const container = document.getElementById(containerId);
     if (!container) return;
     
     // 기본 위치 초기화 (상단, 중앙 정렬)
@@ -135,11 +177,16 @@ function adjustBubblePosition() {
 /**
  * 말풍선 스타일 적용
  */
-function applyBubbleStyle() {
-    const container = document.getElementById("saipet-container");
+function applyBubbleStyle(petId = "primary") {
+    const isSecond = petId === "secondary";
+    const containerId = isSecond ? "saipet-container-2" : "saipet-container";
+    const container = document.getElementById(containerId);
     if (!container) return;
     
-    const { backgroundColor, textColor, accentColor } = state.settings.speechBubble;
+    const speechBubbleSettings = isSecond
+        ? (state.settings.multiPet?.secondPetData?.speechBubble || state.settings.speechBubble)
+        : state.settings.speechBubble;
+    const { backgroundColor, textColor, accentColor } = speechBubbleSettings;
     
     // CSS 변수로 스타일 전달 (ST 테마 격리)
     container.style.setProperty("--spc-bubble-bg", backgroundColor);
@@ -153,13 +200,16 @@ function applyBubbleStyle() {
  * @param {string} speechType - idle, sleeping, dragging 중 하나
  * @returns {string}
  */
-export function getRandomSpeech(speechType) {
+export function getRandomSpeech(speechType, petId = "primary") {
     // 유효한 타입만 허용
     const validTypes = ["idle", "sleeping", "dragging", "click", "greeting", "latenight", "morning", "clickSpam", "longAbsence", "feeding", "hungry", "petting"];
     const type = validTypes.includes(speechType) ? speechType : "idle";
     
     // 커스텀 대사가 있으면 우선 사용
-    const customSpeeches = state.settings.customSpeeches?.[type];
+    const customSpeechesSource = petId === "secondary"
+        ? state.settings.multiPet?.secondPetData?.customSpeeches
+        : state.settings.customSpeeches;
+    const customSpeeches = customSpeechesSource?.[type];
     if (customSpeeches && customSpeeches.length > 0) {
         const validCustom = customSpeeches.filter(s => s && s.trim());
         if (validCustom.length > 0) {
@@ -178,7 +228,7 @@ export function getRandomSpeech(speechType) {
  * 상황에 맞는 대사 표시
  * @param {string} speechType - idle, sleeping, click, petting, greeting 등 상황 키워드
  */
-export function showStateSpeech(speechType) {
-    const speech = getRandomSpeech(speechType);
-    showSpeechBubble(speech);
+export function showStateSpeech(speechType, petId = "primary") {
+    const speech = getRandomSpeech(speechType, petId);
+    showSpeechBubble(speech, null, false, petId);
 }

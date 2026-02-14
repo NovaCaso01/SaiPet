@@ -14,6 +14,21 @@
     gap: 5px;
 }
 
+/* ===== ON/OFF 헤더 토글 ===== */
+
+.stvp-header-toggle {
+    margin-bottom: 10px !important;
+    padding: 8px 12px !important;
+    background: rgba(var(--SmartThemeBodyColorRgb, 0,0,0), 0.05);
+    border: 1px solid var(--SmartThemeBorderColor, rgba(0,0,0,0.1));
+    border-radius: 8px;
+}
+
+.stvp-header-toggle .stvp-row > label:first-child {
+    font-weight: 600;
+    font-size: 0.92em;
+}
+
 /* ===== 탭 메뉴 ===== */
 
 .stvp-tab-bar {
@@ -77,9 +92,12 @@
 
 .stvp-section h5 {
     margin: 0 0 10px 0;
-    padding-bottom: 5px;
+    padding-bottom: 6px;
     border-bottom: 1px solid var(--SmartThemeBorderColor);
     font-size: 0.95em;
+    display: flex;
+    align-items: center;
+    gap: 4px;
 }
 
 .stvp-subsection {
@@ -92,11 +110,15 @@
 }
 
 .stvp-subsection-title {
-    display: block;
+    display: flex;
+    align-items: center;
+    gap: 4px;
     font-size: 0.85em;
     font-weight: bold;
     color: var(--SmartThemeQuoteColor);
     margin-bottom: 2px;
+    padding-left: 6px;
+    border-left: 2px solid var(--SmartThemeQuoteColor, #6fa8dc);
 }
 
 .stvp-divider {
@@ -175,6 +197,19 @@
     min-width: 80px;
     font-size: 0.85em;
     padding: 5px 8px;
+}
+
+/* 로그 버튼 */
+.stvp-log-buttons {
+    flex-wrap: wrap;
+    gap: 5px !important;
+}
+
+.stvp-log-buttons .menu_button {
+    flex: 1;
+    min-width: 70px;
+    font-size: 0.82em;
+    padding: 4px 6px;
 }
 
 /* FA 아이콘-텍스트 여백 */
@@ -334,7 +369,8 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
 
 /* ===== 펫 컨테이너 (ST 테마 격리) ===== */
 
-#saipet-container {
+#saipet-container,
+#saipet-container-2 {
     --pet-size: 250px;
     --spc-bubble-bg: #ffffff;
     --spc-bubble-text: #333333;
@@ -350,7 +386,8 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     line-height: 1.4;
 }
 
-#saipet-container.dragging {
+#saipet-container.dragging,
+#saipet-container-2.dragging {
     cursor: grabbing;
 }
 
@@ -474,7 +511,8 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     transition: opacity 0.25s ease;
 }
 
-#saipet-container:hover .st-pet-condition-row {
+#saipet-container:hover .st-pet-condition-row,
+#saipet-container-2:hover .st-pet-condition-row {
     opacity: 1;
 }
 
@@ -566,7 +604,8 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
 /* 베이스 스타일 그대로 사용 */
 
 /* --- 큐트 --- */
-#saipet-container[data-design="cute"] .st-pet-bubble {
+#saipet-container[data-design="cute"] .st-pet-bubble,
+#saipet-container-2[data-design="cute"] .st-pet-bubble {
     border-radius: 22px;
     border: 2px solid color-mix(in srgb, var(--spc-accent) 35%, transparent);
     box-shadow:
@@ -576,7 +615,8 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
 }
 
 /* 큐트 꼬리 외곽선 */
-#saipet-container[data-design="cute"] .st-pet-bubble::before {
+#saipet-container[data-design="cute"] .st-pet-bubble::before,
+#saipet-container-2[data-design="cute"] .st-pet-bubble::before {
     content: "";
     position: absolute;
     bottom: -11px;
@@ -590,14 +630,16 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     z-index: -1;
 }
 
-#saipet-container[data-design="cute"] .st-pet-bubble.below::before {
+#saipet-container[data-design="cute"] .st-pet-bubble.below::before,
+#saipet-container-2[data-design="cute"] .st-pet-bubble.below::before {
     bottom: auto;
     top: -11px;
     clip-path: polygon(50% 0, 0 100%, 100% 100%);
 }
 
 /* 큐트 하트 장식 (대사 양쪽) */
-#saipet-container[data-design="cute"] .st-pet-bubble-text::before {
+#saipet-container[data-design="cute"] .st-pet-bubble-text::before,
+#saipet-container-2[data-design="cute"] .st-pet-bubble-text::before {
     content: "❤︎";
     margin-right: 5px;
     font-size: 10px;
@@ -605,7 +647,8 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     opacity: 0.7;
 }
 
-#saipet-container[data-design="cute"] .st-pet-bubble-text::after {
+#saipet-container[data-design="cute"] .st-pet-bubble-text::after,
+#saipet-container-2[data-design="cute"] .st-pet-bubble-text::after {
     content: "❤︎";
     margin-left: 5px;
     font-size: 10px;
@@ -613,32 +656,39 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     opacity: 0.7;
 }
 
-#saipet-container[data-design="cute"] .st-pet-hunger-bar {
+#saipet-container[data-design="cute"] .st-pet-hunger-bar,
+#saipet-container-2[data-design="cute"] .st-pet-hunger-bar {
     height: 8px;
     border-radius: 20px;
     border: 1.5px solid color-mix(in srgb, var(--spc-accent) 25%, transparent);
 }
 
-#saipet-container[data-design="cute"] .st-pet-hunger-fill {
+#saipet-container[data-design="cute"] .st-pet-hunger-fill,
+#saipet-container-2[data-design="cute"] .st-pet-hunger-fill {
     opacity: 0.6;
 }
 
 #saipet-container[data-design="cute"] .st-pet-feed-btn,
-#saipet-container[data-design="cute"] .st-pet-chat-btn {
+#saipet-container-2[data-design="cute"] .st-pet-feed-btn,
+#saipet-container[data-design="cute"] .st-pet-chat-btn,
+#saipet-container-2[data-design="cute"] .st-pet-chat-btn {
     font-size: 14px;
 }
 
-#saipet-container[data-design="cute"] .st-pet-chat-text {
+#saipet-container[data-design="cute"] .st-pet-chat-text,
+#saipet-container-2[data-design="cute"] .st-pet-chat-text {
     border-radius: 18px;
     border-color: color-mix(in srgb, var(--spc-accent) 40%, transparent);
 }
 
-#saipet-container[data-design="cute"] .st-pet-chat-text:focus {
+#saipet-container[data-design="cute"] .st-pet-chat-text:focus,
+#saipet-container-2[data-design="cute"] .st-pet-chat-text:focus {
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--spc-accent) 15%, transparent);
 }
 
 /* --- 클래식 (판타지 RPG) --- */
-#saipet-container[data-design="classic"] .st-pet-bubble {
+#saipet-container[data-design="classic"] .st-pet-bubble,
+#saipet-container-2[data-design="classic"] .st-pet-bubble {
     border-radius: 4px;
     border: 2px solid var(--spc-accent, #c9a84c);
     box-shadow:
@@ -649,7 +699,8 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
 }
 
 /* 클래식 꼬리 외곽선 */
-#saipet-container[data-design="classic"] .st-pet-bubble::before {
+#saipet-container[data-design="classic"] .st-pet-bubble::before,
+#saipet-container-2[data-design="classic"] .st-pet-bubble::before {
     content: "";
     position: absolute;
     bottom: -12px;
@@ -663,14 +714,16 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     z-index: -1;
 }
 
-#saipet-container[data-design="classic"] .st-pet-bubble.below::before {
+#saipet-container[data-design="classic"] .st-pet-bubble.below::before,
+#saipet-container-2[data-design="classic"] .st-pet-bubble.below::before {
     bottom: auto;
     top: -12px;
     clip-path: polygon(50% 0, 0 100%, 100% 100%);
 }
 
 /* 클래식 장식 (텍스트 앞뒤에 붙이기) */
-#saipet-container[data-design="classic"] .st-pet-bubble-text::before {
+#saipet-container[data-design="classic"] .st-pet-bubble-text::before,
+#saipet-container-2[data-design="classic"] .st-pet-bubble-text::before {
     content: "⟡";
     margin-right: 5px;
     font-size: 11px;
@@ -678,7 +731,8 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     opacity: 0.6;
 }
 
-#saipet-container[data-design="classic"] .st-pet-bubble-text::after {
+#saipet-container[data-design="classic"] .st-pet-bubble-text::after,
+#saipet-container-2[data-design="classic"] .st-pet-bubble-text::after {
     content: "⟡";
     margin-left: 5px;
     font-size: 11px;
@@ -686,35 +740,42 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     opacity: 0.6;
 }
 
-#saipet-container[data-design="classic"] .st-pet-hunger-bar {
+#saipet-container[data-design="classic"] .st-pet-hunger-bar,
+#saipet-container-2[data-design="classic"] .st-pet-hunger-bar {
     height: 8px;
     border-radius: 2px;
     border: 1px solid var(--spc-accent, #c9a84c);
     background: rgba(60, 40, 20, 0.15);
 }
 
-#saipet-container[data-design="classic"] .st-pet-hunger-fill {
+#saipet-container[data-design="classic"] .st-pet-hunger-fill,
+#saipet-container-2[data-design="classic"] .st-pet-hunger-fill {
     border-radius: 1px;
     opacity: 0.8;
 }
 
 #saipet-container[data-design="classic"] .st-pet-feed-btn,
-#saipet-container[data-design="classic"] .st-pet-chat-btn {
+#saipet-container-2[data-design="classic"] .st-pet-feed-btn,
+#saipet-container[data-design="classic"] .st-pet-chat-btn,
+#saipet-container-2[data-design="classic"] .st-pet-chat-btn {
     font-size: 12px;
 }
 
-#saipet-container[data-design="classic"] .st-pet-chat-text {
+#saipet-container[data-design="classic"] .st-pet-chat-text,
+#saipet-container-2[data-design="classic"] .st-pet-chat-text {
     border-radius: 4px;
     border: 2px solid var(--spc-accent, #c9a84c);
     font-family: 'Georgia', 'Times New Roman', serif;
 }
 
-#saipet-container[data-design="classic"] .st-pet-chat-text:focus {
+#saipet-container[data-design="classic"] .st-pet-chat-text:focus,
+#saipet-container-2[data-design="classic"] .st-pet-chat-text:focus {
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--spc-accent) 20%, transparent);
 }
 
 /* --- 사이버펑크 --- */
-#saipet-container[data-design="cyberpunk"] .st-pet-bubble {
+#saipet-container[data-design="cyberpunk"] .st-pet-bubble,
+#saipet-container-2[data-design="cyberpunk"] .st-pet-bubble {
     border-radius: 2px;
     border: 1px solid var(--spc-accent, #00ffd5);
     box-shadow:
@@ -726,7 +787,8 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     letter-spacing: 0.5px;
 }
 
-#saipet-container[data-design="cyberpunk"] .st-pet-bubble::before {
+#saipet-container[data-design="cyberpunk"] .st-pet-bubble::before,
+#saipet-container-2[data-design="cyberpunk"] .st-pet-bubble::before {
     content: "";
     position: absolute;
     bottom: -10px;
@@ -741,32 +803,37 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     z-index: -1;
 }
 
-#saipet-container[data-design="cyberpunk"] .st-pet-bubble.below::before {
+#saipet-container[data-design="cyberpunk"] .st-pet-bubble.below::before,
+#saipet-container-2[data-design="cyberpunk"] .st-pet-bubble.below::before {
     bottom: auto;
     top: -10px;
     clip-path: polygon(50% 0, 0 100%, 100% 100%);
 }
 
 /* 사이버펑크 스캔라인 오버레이 (별도 요소로) */
-#saipet-container[data-design="cyberpunk"] .st-pet-bubble-text::before {
+#saipet-container[data-design="cyberpunk"] .st-pet-bubble-text::before,
+#saipet-container-2[data-design="cyberpunk"] .st-pet-bubble-text::before {
     content: "> ";
     opacity: 0.4;
 }
 
-#saipet-container[data-design="cyberpunk"] .st-pet-hunger-bar {
+#saipet-container[data-design="cyberpunk"] .st-pet-hunger-bar,
+#saipet-container-2[data-design="cyberpunk"] .st-pet-hunger-bar {
     height: 4px;
     border-radius: 0;
     border: 1px solid color-mix(in srgb, var(--spc-accent) 40%, transparent);
     background: rgba(0, 0, 0, 0.5);
 }
 
-#saipet-container[data-design="cyberpunk"] .st-pet-hunger-fill {
+#saipet-container[data-design="cyberpunk"] .st-pet-hunger-fill,
+#saipet-container-2[data-design="cyberpunk"] .st-pet-hunger-fill {
     border-radius: 0;
     opacity: 0.9;
     box-shadow: 0 0 6px color-mix(in srgb, var(--spc-accent) 50%, transparent);
 }
 
-#saipet-container[data-design="cyberpunk"] .st-pet-chat-text {
+#saipet-container[data-design="cyberpunk"] .st-pet-chat-text,
+#saipet-container-2[data-design="cyberpunk"] .st-pet-chat-text {
     border-radius: 2px;
     border: 1px solid var(--spc-accent, #00ffd5);
     background: rgba(13, 17, 23, 0.95);
@@ -775,16 +842,19 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     box-shadow: 0 0 10px color-mix(in srgb, var(--spc-accent) 15%, transparent);
 }
 
-#saipet-container[data-design="cyberpunk"] .st-pet-chat-text:focus {
+#saipet-container[data-design="cyberpunk"] .st-pet-chat-text:focus,
+#saipet-container-2[data-design="cyberpunk"] .st-pet-chat-text:focus {
     box-shadow: 0 0 15px color-mix(in srgb, var(--spc-accent) 30%, transparent);
 }
 
-#saipet-container[data-design="cyberpunk"] .st-pet-chat-text::placeholder {
+#saipet-container[data-design="cyberpunk"] .st-pet-chat-text::placeholder,
+#saipet-container-2[data-design="cyberpunk"] .st-pet-chat-text::placeholder {
     color: color-mix(in srgb, var(--spc-accent) 40%, transparent);
 }
 
 /* --- 레트로 (팝) --- */
-#saipet-container[data-design="retro"] .st-pet-bubble {
+#saipet-container[data-design="retro"] .st-pet-bubble,
+#saipet-container-2[data-design="retro"] .st-pet-bubble {
     border-radius: 8px;
     border: 3px solid #222222;
     box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.25);
@@ -793,13 +863,15 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     font-weight: 600;
 }
 
-#saipet-container[data-design="retro"] .st-pet-bubble::after {
+#saipet-container[data-design="retro"] .st-pet-bubble::after,
+#saipet-container-2[data-design="retro"] .st-pet-bubble::after {
     width: 16px;
     height: 10px;
     bottom: -10px;
 }
 
-#saipet-container[data-design="retro"] .st-pet-bubble::before {
+#saipet-container[data-design="retro"] .st-pet-bubble::before,
+#saipet-container-2[data-design="retro"] .st-pet-bubble::before {
     content: "";
     position: absolute;
     bottom: -15px;
@@ -813,35 +885,42 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     z-index: -1;
 }
 
-#saipet-container[data-design="retro"] .st-pet-bubble.below::after {
+#saipet-container[data-design="retro"] .st-pet-bubble.below::after,
+#saipet-container-2[data-design="retro"] .st-pet-bubble.below::after {
     top: -10px;
 }
 
-#saipet-container[data-design="retro"] .st-pet-bubble.below::before {
+#saipet-container[data-design="retro"] .st-pet-bubble.below::before,
+#saipet-container-2[data-design="retro"] .st-pet-bubble.below::before {
     bottom: auto;
     top: -15px;
     clip-path: polygon(50% 0, 0 100%, 100% 100%);
 }
 
-#saipet-container[data-design="retro"] .st-pet-hunger-bar {
+#saipet-container[data-design="retro"] .st-pet-hunger-bar,
+#saipet-container-2[data-design="retro"] .st-pet-hunger-bar {
     height: 10px;
     border-radius: 4px;
     border: 2px solid #222222;
     background: rgba(0, 0, 0, 0.1);
 }
 
-#saipet-container[data-design="retro"] .st-pet-hunger-fill {
+#saipet-container[data-design="retro"] .st-pet-hunger-fill,
+#saipet-container-2[data-design="retro"] .st-pet-hunger-fill {
     border-radius: 2px;
     opacity: 0.9;
 }
 
 #saipet-container[data-design="retro"] .st-pet-feed-btn,
-#saipet-container[data-design="retro"] .st-pet-chat-btn {
+#saipet-container-2[data-design="retro"] .st-pet-feed-btn,
+#saipet-container[data-design="retro"] .st-pet-chat-btn,
+#saipet-container-2[data-design="retro"] .st-pet-chat-btn {
     font-weight: bold;
     font-size: 14px;
 }
 
-#saipet-container[data-design="retro"] .st-pet-chat-text {
+#saipet-container[data-design="retro"] .st-pet-chat-text,
+#saipet-container-2[data-design="retro"] .st-pet-chat-text {
     border-radius: 8px;
     border: 3px solid #222222;
     box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.2);
@@ -849,12 +928,14 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     font-weight: 600;
 }
 
-#saipet-container[data-design="retro"] .st-pet-chat-text:focus {
+#saipet-container[data-design="retro"] .st-pet-chat-text:focus,
+#saipet-container-2[data-design="retro"] .st-pet-chat-text:focus {
     border-color: var(--spc-accent, #ff5555);
 }
 
 /* --- 동양풍 (저채도 녹색) --- */
-#saipet-container[data-design="oriental"] .st-pet-bubble {
+#saipet-container[data-design="oriental"] .st-pet-bubble,
+#saipet-container-2[data-design="oriental"] .st-pet-bubble {
     border-radius: 6px;
     border: 1.5px solid color-mix(in srgb, var(--spc-accent) 50%, transparent);
     box-shadow:
@@ -866,7 +947,8 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
 }
 
 /* 동양풍 꼬리 외곽선 */
-#saipet-container[data-design="oriental"] .st-pet-bubble::before {
+#saipet-container[data-design="oriental"] .st-pet-bubble::before,
+#saipet-container-2[data-design="oriental"] .st-pet-bubble::before {
     content: "";
     position: absolute;
     bottom: -11px;
@@ -880,14 +962,16 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     z-index: -1;
 }
 
-#saipet-container[data-design="oriental"] .st-pet-bubble.below::before {
+#saipet-container[data-design="oriental"] .st-pet-bubble.below::before,
+#saipet-container-2[data-design="oriental"] .st-pet-bubble.below::before {
     bottom: auto;
     top: -11px;
     clip-path: polygon(50% 0, 0 100%, 100% 100%);
 }
 
 /* 동양풍 텍스트 장식 『 』 */
-#saipet-container[data-design="oriental"] .st-pet-bubble-text::before {
+#saipet-container[data-design="oriental"] .st-pet-bubble-text::before,
+#saipet-container-2[data-design="oriental"] .st-pet-bubble-text::before {
     content: "『";
     margin-right: 3px;
     font-size: 12px;
@@ -895,7 +979,8 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     opacity: 0.7;
 }
 
-#saipet-container[data-design="oriental"] .st-pet-bubble-text::after {
+#saipet-container[data-design="oriental"] .st-pet-bubble-text::after,
+#saipet-container-2[data-design="oriental"] .st-pet-bubble-text::after {
     content: "』";
     margin-left: 3px;
     font-size: 12px;
@@ -903,38 +988,47 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     opacity: 0.7;
 }
 
-#saipet-container[data-design="oriental"] .st-pet-hunger-bar {
+#saipet-container[data-design="oriental"] .st-pet-hunger-bar,
+#saipet-container-2[data-design="oriental"] .st-pet-hunger-bar {
     height: 6px;
     border-radius: 2px;
     border: 1px solid color-mix(in srgb, var(--spc-accent) 35%, transparent);
     background: rgba(60, 80, 60, 0.08);
 }
 
-#saipet-container[data-design="oriental"] .st-pet-hunger-fill {
+#saipet-container[data-design="oriental"] .st-pet-hunger-fill,
+#saipet-container-2[data-design="oriental"] .st-pet-hunger-fill {
     border-radius: 1px;
     opacity: 0.7;
 }
 
 #saipet-container[data-design="oriental"] .st-pet-feed-btn,
-#saipet-container[data-design="oriental"] .st-pet-chat-btn {
+#saipet-container-2[data-design="oriental"] .st-pet-feed-btn,
+#saipet-container[data-design="oriental"] .st-pet-chat-btn,
+#saipet-container-2[data-design="oriental"] .st-pet-chat-btn {
     font-size: 12px;
 }
 
-#saipet-container[data-design="oriental"] .st-pet-chat-text {
+#saipet-container[data-design="oriental"] .st-pet-chat-text,
+#saipet-container-2[data-design="oriental"] .st-pet-chat-text {
     border-radius: 6px;
     border: 1.5px solid color-mix(in srgb, var(--spc-accent) 50%, transparent);
     font-family: 'Georgia', '바탕', 'Batang', serif;
 }
 
-#saipet-container[data-design="oriental"] .st-pet-chat-text:focus {
+#saipet-container[data-design="oriental"] .st-pet-chat-text:focus,
+#saipet-container-2[data-design="oriental"] .st-pet-chat-text:focus {
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--spc-accent) 15%, transparent);
 }
 
 /* ===== 커스텀 폰트 ===== */
 
 #saipet-container[data-custom-font] .st-pet-bubble,
+#saipet-container-2[data-custom-font] .st-pet-bubble,
 #saipet-container[data-custom-font] .st-pet-bubble-text,
-#saipet-container[data-custom-font] .st-pet-chat-text {
+#saipet-container-2[data-custom-font] .st-pet-bubble-text,
+#saipet-container[data-custom-font] .st-pet-chat-text,
+#saipet-container-2[data-custom-font] .st-pet-chat-text {
     font-family: var(--spc-font) !important;
 }
 
@@ -946,11 +1040,13 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     50% { transform: translateY(-15px); }
 }
 
-#saipet-container.bounce .st-pet-sprite {
+#saipet-container.bounce .st-pet-sprite,
+#saipet-container-2.bounce .st-pet-sprite {
     animation: petBounce 0.5s ease;
 }
 
-#saipet-container.bounce .st-pet-sprite.flipped {
+#saipet-container.bounce .st-pet-sprite.flipped,
+#saipet-container-2.bounce .st-pet-sprite.flipped {
     animation: petBounceFlipped 0.5s ease;
 }
 
@@ -966,11 +1062,13 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     75% { transform: rotate(10deg); }
 }
 
-#saipet-container.shake .st-pet-sprite {
+#saipet-container.shake .st-pet-sprite,
+#saipet-container-2.shake .st-pet-sprite {
     animation: petShake 0.5s ease;
 }
 
-#saipet-container.shake .st-pet-sprite.flipped {
+#saipet-container.shake .st-pet-sprite.flipped,
+#saipet-container-2.shake .st-pet-sprite.flipped {
     animation: petShakeFlipped 0.5s ease;
 }
 
@@ -982,21 +1080,26 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
 
 /* 상태별 애니메이션 - 성능 최적화 */
 #saipet-container.state-thinking .st-pet-sprite,
-#saipet-container.state-sleeping .st-pet-sprite {
+#saipet-container-2.state-thinking .st-pet-sprite,
+#saipet-container.state-sleeping .st-pet-sprite,
+#saipet-container-2.state-sleeping .st-pet-sprite {
     will-change: transform;
 }
 
-#saipet-container.state-thinking .st-pet-sprite {
+#saipet-container.state-thinking .st-pet-sprite,
+#saipet-container-2.state-thinking .st-pet-sprite {
     animation: petThinking 2s ease-in-out infinite;
 }
 
 /* 드래그 중에는 살랑살랑 흔들리기 */
-#saipet-container.dragging .st-pet-sprite {
+#saipet-container.dragging .st-pet-sprite,
+#saipet-container-2.dragging .st-pet-sprite {
     animation: petDragWiggle 0.4s ease-in-out infinite !important;
     will-change: transform;
 }
 
-#saipet-container.dragging .st-pet-sprite.flipped {
+#saipet-container.dragging .st-pet-sprite.flipped,
+#saipet-container-2.dragging .st-pet-sprite.flipped {
     animation: petDragWiggleFlipped 0.4s ease-in-out infinite !important;
 }
 
@@ -1017,7 +1120,8 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     50% { transform: scale(1.03); }
 }
 
-#saipet-container.state-sleeping .st-pet-sprite {
+#saipet-container.state-sleeping .st-pet-sprite,
+#saipet-container-2.state-sleeping .st-pet-sprite {
     animation: petSleeping 3s ease-in-out infinite;
 }
 
@@ -1109,15 +1213,18 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
 
 /* ===== 걷기 애니메이션 ===== */
 
-#saipet-container.walking {
+#saipet-container.walking,
+#saipet-container-2.walking {
     transition: left 2.5s ease-in-out, top 2.5s ease-in-out;
 }
 
-#saipet-container.walking .st-pet-sprite {
+#saipet-container.walking .st-pet-sprite,
+#saipet-container-2.walking .st-pet-sprite {
     animation: petWaddle 0.5s ease-in-out infinite !important;
 }
 
-#saipet-container.walking .st-pet-sprite.flipped {
+#saipet-container.walking .st-pet-sprite.flipped,
+#saipet-container-2.walking .st-pet-sprite.flipped {
     animation: petWaddleFlipped 0.5s ease-in-out infinite !important;
 }
 
@@ -1247,6 +1354,16 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
 .stvp-log-badge-reaction {
     background: rgba(33, 150, 243, 0.15);
     color: #2196F3;
+}
+
+.stvp-log-badge-interpet {
+    background: rgba(156, 39, 176, 0.15);
+    color: #9C27B0;
+}
+
+.stvp-log-badge-dual {
+    background: rgba(255, 152, 0, 0.15);
+    color: #FF9800;
 }
 
 .stvp-log-user {

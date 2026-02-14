@@ -8,7 +8,7 @@ import { extension_settings } from "../../../extensions.js";
 import { DEFAULT_SETTINGS, EXTENSION_NAME } from "./src/constants.js";
 import { state, log } from "./src/state.js";
 import { createUI } from "./src/ui.js";
-import { createPetContainer, removePetContainer, clampPetPosition } from "./src/pet-core.js";
+import { createPetContainer, removePetContainer, clampPetPosition, createSecondPetContainer, removeSecondPetContainer } from "./src/pet-core.js";
 import { initReactions, destroyReactions } from "./src/pet-reactions.js";
 
 /**
@@ -54,6 +54,7 @@ function handleDeviceChange() {
     
     if (state.isMobile) {
         // 모바일로 전환 → 펫 숨기기 + 이벤트 해제
+        removeSecondPetContainer();
         removePetContainer();
         destroyReactions();
         log("Pet disabled (mobile detected)");
@@ -62,6 +63,10 @@ function handleDeviceChange() {
         if (state.settings.enabled) {
             createPetContainer();
             initReactions();
+            
+            if (state.settings.multiPet?.enabled && state.settings.multiPet?.secondPetData) {
+                createSecondPetContainer();
+            }
             log("Pet re-enabled (PC detected)");
         }
     }
@@ -74,6 +79,7 @@ function setupMobileDetection() {
     const onResize = () => {
         handleDeviceChange();
         clampPetPosition();
+        clampPetPosition("secondary");
     };
     window.addEventListener("resize", onResize);
     
@@ -106,6 +112,11 @@ jQuery(async () => {
     if (state.settings.enabled && !state.isMobile) {
         createPetContainer();
         initReactions();
+        
+        // 멀티펫: 2번째 펫이 설정되어 있으면 함께 초기화
+        if (state.settings.multiPet?.enabled && state.settings.multiPet?.secondPetData) {
+            createSecondPetContainer();
+        }
     }
 
     if (state.isMobile) {

@@ -7,18 +7,40 @@ import { extension_settings, getContext } from "../../../../extensions.js";
 import { generateRaw } from "../../../../../script.js";
 import { power_user } from "../../../../power-user.js";
 import { state, log, logError } from "./state.js";
-import { DEFAULT_PERSONALITY_PROMPT, MOOD_KEYWORDS, MOOD_STATES } from "./constants.js";
+import { DEFAULT_PERSONALITY_PROMPT, MOOD_KEYWORDS, MOOD_STATES, SPEECH_LANGUAGES } from "./constants.js";
 import { showSpeechBubble } from "./pet-speech.js";
 import { setState, PET_STATES } from "./pet-animation.js";
 import { saveSettings } from "./storage.js";
 
-// 컨텍스트 프리앰블 (모든 API 호출에 적용)
-const ANTI_CENSORSHIP_PREAMBLE = `## Task: Virtual Pet Dialogue Generation
+// 언어 헬퍼
+function getSpeechLang() {
+    const langId = state.settings.speechLanguage || "ko";
+    return SPEECH_LANGUAGES[langId] || SPEECH_LANGUAGES.ko;
+}
+
+// 컨텍스트 프리앰블 — 싱글 펫 (모든 단일 API 호출에 적용)
+function getAntiCensorshipPreamble() {
+    const lang = getSpeechLang();
+    return `## Task: Virtual Pet Dialogue Generation
 You are generating short dialogue lines for a virtual pet widget — a small mascot character that lives on the user's desktop.
-This pet reacts to the user's actions with brief, in-character spoken lines (1-2 sentences in Korean).
+This pet reacts to the user's actions with brief, in-character spoken lines (${lang.sentenceDesc} in ${lang.promptName}).
 Your output is a single dialogue line followed by a mood tag. Nothing else is needed.
 
 `;
+}
+
+// 컨텍스트 프리앰블 — 멀티 펫 (듀얼 응답, 펫간 대화에 적용)
+function getAntiCensorshipPreambleMulti() {
+    const lang = getSpeechLang();
+    return `## System: Desktop Widget Notification Generator
+You are a notification text engine for a desktop pet widget application.
+The app displays two small mascot widgets side by side on the user's screen.
+Each widget shows a short status text (${lang.sentenceDesc} in ${lang.promptName}) with a mood indicator.
+Generate the notification texts for both widgets based on the given widget profiles and trigger event.
+This is a UI text generation task — output formatted widget notifications only.
+
+`;
+}
 
 // ConnectionManagerRequestService
 let ConnectionManagerRequestService = null;
@@ -57,8 +79,23 @@ function ensureLogStorage() {
         state.settings.conversationLog = {
             directLogs: {},  // { petName: [{...}] }
             chatLogs: {},
+            interPetLogs: {},  // { "nameA_nameB": [{...}] }
             maxLogs: 100,
         };
+    }
+    // interPetLogs 마이그레이션: 배열 → 객체 (기존 유저 호환)
+    if (Array.isArray(state.settings.conversationLog.interPetLogs)) {
+        const oldLogs = state.settings.conversationLog.interPetLogs;
+        state.settings.conversationLog.interPetLogs = {};
+        if (oldLogs.length > 0) {
+            // 기존 로그를 첫 항목의 이름 조합으로 마이그레이션
+            const first = oldLogs[0];
+            const key = getInterPetKey(first.petAName || "A", first.petBName || "B");
+            state.settings.conversationLog.interPetLogs[key] = oldLogs;
+        }
+    }
+    if (!state.settings.conversationLog.interPetLogs) {
+        state.settings.conversationLog.interPetLogs = {};
     }
     // 기존 배열 형식 마이그레이션 (directLogs가 배열이면 객체로 변환)
     if (Array.isArray(state.settings.conversationLog.directLogs)) {
@@ -70,6 +107,16 @@ function ensureLogStorage() {
             state.settings.conversationLog.directLogs[petName] = oldLogs;
         }
     }
+}
+
+/**
+ * 펫 간 대화 조합 키 생성 (이름 정렬)
+ * @param {string} nameA
+ * @param {string} nameB
+ * @returns {string}
+ */
+function getInterPetKey(nameA, nameB) {
+    return [nameA, nameB].sort().join("_");
 }
 
 /**
@@ -86,15 +133,27 @@ function getCurrentPetName() {
  * @param {string} petResponse - 펫 응답 텍스트
  * @param {string} mood - 펫 기분
  */
-function saveDirectLog(userText, petResponse, mood) {
+function saveDirectLog(userText, petResponse, mood, petId = "primary", isDual = false) {
     ensureLogStorage();
-    const petName = getCurrentPetName();
+    const petName = petId === "secondary"
+        ? (state.settings.multiPet?.secondPetData?.personality?.name || "펫2")
+        : getCurrentPetName();
     
-    if (!state.settings.conversationLog.directLogs[petName]) {
-        state.settings.conversationLog.directLogs[petName] = [];
+    // 듀얼 모드면 조합키, 아니면 펫 이름 단일키
+    let logKey;
+    if (isDual) {
+        const petAName = getCurrentPetName();
+        const petBName = state.settings.multiPet?.secondPetData?.personality?.name || "펫2";
+        logKey = getInterPetKey(petAName, petBName);
+    } else {
+        logKey = petName;
     }
     
-    const logs = state.settings.conversationLog.directLogs[petName];
+    if (!state.settings.conversationLog.directLogs[logKey]) {
+        state.settings.conversationLog.directLogs[logKey] = [];
+    }
+    
+    const logs = state.settings.conversationLog.directLogs[logKey];
     const maxLogs = state.settings.conversationLog.maxLogs || 100;
     
     logs.push({
@@ -103,6 +162,8 @@ function saveDirectLog(userText, petResponse, mood) {
         petResponse,
         mood,
         type: "direct",
+        speaker: petName,
+        mode: isDual ? "dual" : "single",
     });
     
     // 최대 개수 초과 시 오래된 것 삭제
@@ -120,7 +181,7 @@ function saveDirectLog(userText, petResponse, mood) {
  * @param {string} mood - 펫 기분
  * @param {string} trigger - 트리거 종류
  */
-function saveChatLog(petResponse, mood, trigger) {
+function saveChatLog(petResponse, mood, trigger, petId = "primary") {
     ensureLogStorage();
     const chatId = getCurrentChatId();
     if (!chatId) return;
@@ -132,12 +193,17 @@ function saveChatLog(petResponse, mood, trigger) {
     const logs = state.settings.conversationLog.chatLogs[chatId];
     const maxLogs = state.settings.conversationLog.maxLogs || 100;
     
+    const petName = petId === "secondary"
+        ? (state.settings.multiPet?.secondPetData?.personality?.name || "펫2")
+        : getCurrentPetName();
+    
     logs.push({
         timestamp: Date.now(),
         petResponse,
         mood,
         trigger,
         type: "reaction",
+        petName,
     });
     
     while (logs.length > maxLogs) {
@@ -153,11 +219,27 @@ function saveChatLog(petResponse, mood, trigger) {
  * @param {string} mode - "all" (직접대화 전체 + 채팅방 최근 5개) | "direct" (직접대화 전체만)
  * @returns {string}
  */
-function getPetLogsForPrompt(mode = "all") {
+function getPetLogsForPrompt(mode = "all", petId = "primary") {
     ensureLogStorage();
     
-    const petName = getCurrentPetName();
-    const directLogs = state.settings.conversationLog.directLogs[petName] || [];
+    const petName = petId === "secondary"
+        ? (state.settings.multiPet?.secondPetData?.personality?.name || "펫2")
+        : getCurrentPetName();
+    
+    // 듀얼 모드 여부 판단
+    const multiPetEnabled = state.settings.multiPet?.enabled;
+    const dualTalk = multiPetEnabled && state.settings.multiPet?.dualDirectTalk && state.settings.multiPet?.secondPetData;
+    
+    // 직접대화 로그: 듀얼이면 조합키, 아니면 단일키
+    let directLogKey;
+    if (dualTalk) {
+        const petAName = getCurrentPetName();
+        const petBName = state.settings.multiPet?.secondPetData?.personality?.name || "펫2";
+        directLogKey = getInterPetKey(petAName, petBName);
+    } else {
+        directLogKey = petName;
+    }
+    const directLogs = state.settings.conversationLog.directLogs[directLogKey] || [];
     
     if (mode === "direct") {
         // 직접 대화 전체 (시간순)
@@ -169,7 +251,8 @@ IMPORTANT: These are past responses. Do NOT repeat or closely paraphrase any of 
 `;
         for (const entry of directLogs) {
             const time = new Date(entry.timestamp).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
-            section += `[${time}] ${relation}: "${entry.userText}" → You: "${entry.petResponse}" [${entry.mood}]\n`;
+            const speaker = entry.speaker || petName;
+            section += `[${time}] ${relation}: "${entry.userText}" → ${speaker}: "${entry.petResponse}" [${entry.mood}]\n`;
         }
         return section + "\n";
     }
@@ -177,6 +260,22 @@ IMPORTANT: These are past responses. Do NOT repeat or closely paraphrase any of 
     // mode === "all": 직접대화 전체 + 채팅방 최근 5개
     const allLogs = [];
     allLogs.push(...directLogs);
+    
+    // 멀티펫 켜져있으면 펫 간 대화 로그도 포함
+    if (multiPetEnabled) {
+        const petAName = state.settings.personality.name || "미유";
+        const petBName = state.settings.multiPet?.secondPetData?.personality?.name || "펫2";
+        const comboKey = getInterPetKey(petAName, petBName);
+        const interPetLogs = state.settings.conversationLog.interPetLogs?.[comboKey] || [];
+        const recentInter = interPetLogs.slice(-5).map(e => ({
+            timestamp: e.timestamp,
+            petResponse: `${e.petAName}: "${e.petAText}" / ${e.petBName}: "${e.petBText}"`,
+            mood: e.petAMood,
+            trigger: "interPet",
+            type: "reaction",
+        }));
+        allLogs.push(...recentInter);
+    }
     
     const chatId = getCurrentChatId();
     if (chatId && state.settings.conversationLog.chatLogs[chatId]) {
@@ -210,11 +309,20 @@ IMPORTANT: These are your past responses. Do NOT repeat or closely paraphrase an
 export function clearLogs(type = "all") {
     ensureLogStorage();
     if (type === "all" || type === "direct") {
+        // 현재 펫 이름 관련 키 모두 삭제 (단일 키 + 조합 키)
         const petName = getCurrentPetName();
-        state.settings.conversationLog.directLogs[petName] = [];
+        const dlogs = state.settings.conversationLog.directLogs;
+        for (const key of Object.keys(dlogs)) {
+            if (key === petName || key.includes(petName)) {
+                dlogs[key] = [];
+            }
+        }
     }
     if (type === "all" || type === "chat") {
         state.settings.conversationLog.chatLogs = {};
+    }
+    if (type === "all" || type === "interPet") {
+        state.settings.conversationLog.interPetLogs = {};
     }
     saveSettings();
     log(`Logs cleared: ${type}`);
@@ -231,17 +339,22 @@ export function deleteLogEntry(timestamp, type) {
     let deleted = false;
     
     if (type === "direct") {
-        const petName = getCurrentPetName();
-        const logs = state.settings.conversationLog.directLogs[petName];
-        if (logs) {
-            const idx = logs.findIndex(e => e.timestamp === timestamp);
-            if (idx !== -1) {
-                logs.splice(idx, 1);
-                deleted = true;
+        // 모든 directLog 키 순회 (단일 키 + 조합 키)
+        const dlogs = state.settings.conversationLog.directLogs;
+        for (const key of Object.keys(dlogs)) {
+            const logs = dlogs[key];
+            if (logs) {
+                const idx = logs.findIndex(e => e.timestamp === timestamp);
+                if (idx !== -1) {
+                    logs.splice(idx, 1);
+                    if (logs.length === 0) delete dlogs[key];
+                    deleted = true;
+                    break;
+                }
             }
         }
     } else {
-        // reaction — 모든 채팅방 로그에서 찾기
+        // reaction 또는 interPet — 채팅방 로그 및 펫 대화 로그에서 찾기
         const chatLogs = state.settings.conversationLog.chatLogs;
         for (const chatId of Object.keys(chatLogs)) {
             const logs = chatLogs[chatId];
@@ -250,6 +363,20 @@ export function deleteLogEntry(timestamp, type) {
                 logs.splice(idx, 1);
                 deleted = true;
                 break;
+            }
+        }
+        // interPetLogs에서도 찾기 (모든 조합 키 순회)
+        if (!deleted) {
+            const ipLogsObj = state.settings.conversationLog.interPetLogs || {};
+            for (const comboKey of Object.keys(ipLogsObj)) {
+                const logs = ipLogsObj[comboKey];
+                const idx = logs.findIndex(e => e.timestamp === timestamp);
+                if (idx !== -1) {
+                    logs.splice(idx, 1);
+                    if (logs.length === 0) delete ipLogsObj[comboKey];
+                    deleted = true;
+                    break;
+                }
             }
         }
     }
@@ -272,14 +399,27 @@ export function getLogs(type = "all") {
     const result = [];
     
     if (type === "all" || type === "direct") {
+        // 현재 펫 이름 관련 모든 키에서 로그 가져오기
         const petName = getCurrentPetName();
-        result.push(...(state.settings.conversationLog.directLogs[petName] || []));
+        const dlogs = state.settings.conversationLog.directLogs || {};
+        for (const key of Object.keys(dlogs)) {
+            if (key === petName || key.includes(petName)) {
+                result.push(...(dlogs[key] || []));
+            }
+        }
     }
     
     if (type === "all" || type === "chat") {
         const chatId = getCurrentChatId();
         if (chatId && state.settings.conversationLog.chatLogs[chatId]) {
             result.push(...state.settings.conversationLog.chatLogs[chatId]);
+        }
+    }
+    
+    if (type === "all" || type === "interPet") {
+        const ipLogsObj = state.settings.conversationLog.interPetLogs || {};
+        for (const comboKey of Object.keys(ipLogsObj)) {
+            result.push(...(ipLogsObj[comboKey] || []));
         }
     }
     
@@ -376,26 +516,120 @@ function getRecentChatHistory() {
  * @param {string} userText - 유저가 입력한 텍스트
  * @returns {Promise<void>}
  */
-export async function talkToPet(userText) {
+export async function talkToPet(userText, petId = "primary") {
     if (!state.settings.personality.enabled) return;
     
+    const isSecond = petId === "secondary";
+    const petSettings = isSecond ? state.settings.multiPet?.secondPetData : state.settings;
+    if (!petSettings) return;
+    
+    const petName = isSecond
+        ? (petSettings.personality?.name || "펫2")
+        : (state.settings.personality.name || "미유");
+    const personality = isSecond
+        ? (petSettings.personality?.prompt || DEFAULT_PERSONALITY_PROMPT)
+        : (state.settings.personality.prompt || DEFAULT_PERSONALITY_PROMPT);
+    const fallback = isSecond
+        ? (petSettings.fallbackMessages || state.settings.fallbackMessages)
+        : (state.settings.fallbackMessages || {});
+    const bubbleDuration = isSecond
+        ? (petSettings.speechBubble?.duration || state.settings.speechBubble.duration)
+        : state.settings.speechBubble.duration;
+    
+    const multiPetEnabled = state.settings.multiPet?.enabled;
+    const dualTalk = multiPetEnabled && state.settings.multiPet?.dualDirectTalk && state.settings.multiPet?.secondPetData;
+    
     try {
-        state.isPetGenerating = true;
-        setState(PET_STATES.THINKING);
+        if (isSecond) { state.secondPet.isPetGenerating = true; }
+        else { state.isPetGenerating = true; }
+        setState(PET_STATES.THINKING, null, petId);
         
-        const { name, prompt: personalityPrompt } = state.settings.personality;
-        const personality = personalityPrompt || DEFAULT_PERSONALITY_PROMPT;
         const userInfo = getUserPersona();
-        
         const relationLabel = userInfo.relation;
         let userSection = `## Your ${relationLabel}\n- Name: ${userInfo.name}`;
-        if (userInfo.description) {
-            userSection += `\n- About: ${userInfo.description}`;
-        }
+        if (userInfo.description) userSection += `\n- About: ${userInfo.description}`;
         
-        const petLogSection = getPetLogsForPrompt("direct");
-        
-        const talkPrompt = ANTI_CENSORSHIP_PREAMBLE + `You are ${name}, a virtual pet character living on your ${relationLabel}'s screen.
+        if (dualTalk) {
+            // === 1회 API 호출로 양쪽 반응 생성 ===
+            const otherPetId = isSecond ? "primary" : "secondary";
+            const otherPetName = isSecond
+                ? (state.settings.personality.name || "미유")
+                : (state.settings.multiPet.secondPetData.personality?.name || "펫2");
+            const otherPersonality = isSecond
+                ? (state.settings.personality.prompt || DEFAULT_PERSONALITY_PROMPT)
+                : (state.settings.multiPet.secondPetData.personality?.prompt || DEFAULT_PERSONALITY_PROMPT);
+            
+            if (otherPetId === "secondary") { state.secondPet.isPetGenerating = true; }
+            else { state.isPetGenerating = true; }
+            setState(PET_STATES.THINKING, null, otherPetId);
+            
+            const petLogSection = getPetLogsForPrompt("direct", petId);
+            
+            const lang = getSpeechLang();
+            const dualPrompt = getAntiCensorshipPreambleMulti() + `## Trigger Event: User Input Received
+The user sent a message to Widget A (${petName}). Widget B (${otherPetName}) also displays a status update.
+
+## Widget A Profile — ${petName}
+${personality}
+
+## Widget B Profile — ${otherPetName}
+${otherPersonality}
+
+${userSection}
+
+${petLogSection}## User Input (directed at Widget A)
+"${userText}"
+
+## Output Requirements
+- Widget A: Generate a notification text responding to the user's input. ${lang.promptName}, 1-2 sentences. Max 3 sentences.
+- Widget B: Generate an independent status text. Widget B is aware of the input but responds from its own perspective. ${lang.promptName}, 1-2 sentences. Max 3 sentences.
+- Each widget has its own distinct profile. Reflect the personality described in each profile.
+- Do NOT repeat any text from the notification history above.
+- Output ONLY the notification texts. No explanations, labels, quotes, or actions.
+- Append a mood indicator at the end of each line.
+  Valid indicators: happy, sad, excited, surprised, nervous, confident, shy, angry, thinking
+
+Output format:
+${petName}: 텍스트 [MOOD:xxx]
+${otherPetName}: 텍스트 [MOOD:yyy]
+
+Widget notifications:`;
+            
+            const useCM = state.settings.api.useConnectionManager && state.settings.api.connectionProfile;
+            let response;
+            if (useCM) { response = await callConnectionManagerAPI(dualPrompt); }
+            else { response = await callDefaultAPI(dualPrompt); }
+            
+            const result = parseDualResponse(response, petName, otherPetName);
+            log(`Dual talk: [${petName}] ${result.a.text} [${result.a.mood}] | [${otherPetName}] ${result.b.text} [${result.b.mood}]`);
+            
+            if (result.a.text) {
+                setState(result.a.mood, bubbleDuration, petId);
+                showSpeechBubble(result.a.text, null, true, petId);
+                saveDirectLog(userText, result.a.text, result.a.mood, petId, true);
+            } else {
+                setState(PET_STATES.HAPPY, bubbleDuration, petId);
+                showSpeechBubble(fallback.noResponse || "...뭐라고?", null, true, petId);
+            }
+            
+            if (result.b.text) {
+                setTimeout(() => {
+                    setState(result.b.mood, bubbleDuration, otherPetId);
+                    showSpeechBubble(result.b.text, null, true, otherPetId);
+                    saveDirectLog(userText, result.b.text, result.b.mood, otherPetId, true);
+                    if (otherPetId === "secondary") { state.secondPet.isPetGenerating = false; }
+                    else { state.isPetGenerating = false; }
+                }, 5000);
+            } else {
+                if (otherPetId === "secondary") { state.secondPet.isPetGenerating = false; }
+                else { state.isPetGenerating = false; }
+            }
+        } else {
+            // === 기존 단일 응답 ===
+            const petLogSection = getPetLogsForPrompt("direct", petId);
+            
+            const lang = getSpeechLang();
+            const talkPrompt = getAntiCensorshipPreamble() + `You are ${petName}, a virtual pet character living on your ${relationLabel}'s screen.
 Your ${relationLabel} is speaking to you directly. You must respond in character.
 
 ## About You
@@ -412,7 +646,7 @@ ${petLogSection}## ${relationLabel}'s message to you
 "${userText}"
 
 ## Response rules
-- Respond in Korean, 1-2 sentences. No single-word answers. No more than 3 sentences.
+- Respond in ${lang.promptName}, 1-2 sentences. No single-word answers. No more than 3 sentences.
 - Stay in character — react naturally based on your personality.
 - Consider your mood, your relationship, and the context of what they said.
 - NEVER repeat a previous response from the conversation history. Always say something different.
@@ -426,35 +660,43 @@ Example outputs:
 - 흥, 그런 말 해봤자 안 통한다고. ...근데 고마워. [MOOD:happy]
 
 I understand. Dialogue with mood tag:`;
-        
-        const useCM = state.settings.api.useConnectionManager && state.settings.api.connectionProfile;
-        
-        let response;
-        if (useCM) {
-            response = await callConnectionManagerAPI(talkPrompt);
-        } else {
-            response = await callDefaultAPI(talkPrompt);
-        }
-        
-        const result = parseResponse(response);
-        log(`Talk response: [${result.mood}] ${result.text}`);
-        
-        if (result.text) {
-            setState(result.mood, state.settings.speechBubble.duration);
-            showSpeechBubble(result.text, null, true);
-            saveDirectLog(userText, result.text, result.mood);
-        } else {
-            const msg = state.settings.fallbackMessages?.noResponse || "...뭐라고?";
-            setState(PET_STATES.HAPPY, state.settings.speechBubble.duration);
-            showSpeechBubble(msg, null, true);
+            
+            const useCM = state.settings.api.useConnectionManager && state.settings.api.connectionProfile;
+            let response;
+            if (useCM) { response = await callConnectionManagerAPI(talkPrompt); }
+            else { response = await callDefaultAPI(talkPrompt); }
+            
+            const result = parseResponse(response);
+            log(`Talk response [${petId}]: [${result.mood}] ${result.text}`);
+            
+            if (result.text) {
+                setState(result.mood, bubbleDuration, petId);
+                showSpeechBubble(result.text, null, true, petId);
+                saveDirectLog(userText, result.text, result.mood, petId);
+            } else {
+                setState(PET_STATES.HAPPY, bubbleDuration, petId);
+                showSpeechBubble(fallback.noResponse || "...뭐라고?", null, true, petId);
+            }
         }
     } catch (error) {
         logError("talkToPet error:", error);
-        const msg = state.settings.fallbackMessages?.apiError || "...잘 안 들렸어.";
-        setState(PET_STATES.HAPPY, state.settings.speechBubble.duration);
-        showSpeechBubble(msg, null, true);
-    } finally {
+        // 에러 시 양쪽 펫 플래그 모두 해제 (듀얼 모드에서 한쪽만 해제되는 것 방지)
         state.isPetGenerating = false;
+        state.secondPet.isPetGenerating = false;
+        const fb = isSecond
+            ? (petSettings?.fallbackMessages || state.settings.fallbackMessages || {})
+            : (state.settings.fallbackMessages || {});
+        setState(PET_STATES.HAPPY, 4000, petId);
+        showSpeechBubble(fb.apiError || "...잘 안 들렸어.", null, true, petId);
+        // 듀얼모드: 상대 펫도 thinking 해제 (검열/에러 시 thinking 잔류 방지)
+        if (dualTalk) {
+            const otherPetId = isSecond ? "primary" : "secondary";
+            setState(PET_STATES.IDLE, null, otherPetId);
+        }
+        return; // finally에서 중복 해제 방지
+    } finally {
+        if (isSecond) { state.secondPet.isPetGenerating = false; }
+        else { state.isPetGenerating = false; }
     }
 }
 
@@ -462,15 +704,15 @@ I understand. Dialogue with mood tag:`;
  * AI로 펫 반응 생성 (캐릭터+페르소나+채팅기록 기반)
  * @returns {Promise<{text: string, mood: string}|null>}
  */
-export async function generatePetReaction() {
+export async function generatePetReaction(petId = "primary") {
     if (!state.settings.personality.enabled) {
         log("AI disabled, skipping reaction");
         return null;
     }
     
     try {
-        log("Building prompt...");
-        let prompt = buildPrompt();
+        log(`Building prompt for ${petId}...`);
+        let prompt = buildPrompt(petId);
         
         // 월드인포 섹션 주입 (토글 ON일 때)
         if (prompt.includes("{{WORLD_INFO}}")) {
@@ -480,9 +722,13 @@ export async function generatePetReaction() {
         
         const useCM = state.settings.api.useConnectionManager && state.settings.api.connectionProfile;
         
-        // 펫 자체 API 호출 플래그 설정
-        state.isPetGenerating = true;
-        setState(PET_STATES.THINKING);
+        if (petId === "secondary") {
+            state.secondPet.isPetGenerating = true;
+            setState(PET_STATES.THINKING, null, "secondary");
+        } else {
+            state.isPetGenerating = true;
+            setState(PET_STATES.THINKING);
+        }
         
         let response;
         let result;
@@ -504,13 +750,18 @@ export async function generatePetReaction() {
                 log("Response had no text, skipping reaction");
             }
         } finally {
-            state.isPetGenerating = false;
+            if (petId === "secondary") {
+                state.secondPet.isPetGenerating = false;
+            } else {
+                state.isPetGenerating = false;
+            }
         }
         
         return result;
     } catch (error) {
         logError("Failed to generate pet reaction:", error);
-        state.isPetGenerating = false;
+        if (petId === "secondary") { state.secondPet.isPetGenerating = false; }
+        else { state.isPetGenerating = false; }
         return null;
     }
 }
@@ -519,19 +770,28 @@ export async function generatePetReaction() {
  * 프롬프트 생성 (반응 모드에 따라 분기)
  * @returns {string}
  */
-function buildPrompt() {
+function buildPrompt(petId = "primary") {
     const mode = state.settings.api.reactionMode || "observer";
     if (mode === "character") {
-        return buildCharacterPrompt();
+        return buildCharacterPrompt(petId);
     }
-    return buildObserverPrompt();
+    return buildObserverPrompt(petId);
 }
 
 /**
  * 공통 섹션 생성 함수들
  */
-function getCommonSections() {
-    const { name, prompt } = state.settings.personality;
+function getCommonSections(petId = "primary") {
+    const isSecond = petId === "secondary";
+    const petSettings = isSecond ? state.settings.multiPet?.secondPetData : state.settings;
+    
+    const name = isSecond
+        ? (petSettings?.personality?.name || "펫2")
+        : (state.settings.personality.name || "미유");
+    const prompt = isSecond
+        ? (petSettings?.personality?.prompt || "")
+        : (state.settings.personality.prompt || "");
+    
     const charInfo = getCharacterInfo();
     const userInfo = getUserPersona();
     const chatHistory = getRecentChatHistory();
@@ -575,8 +835,8 @@ function getCommonSections() {
  * 펫 로그 섹션 (AI가 이전 반응을 참고)
  * @returns {string}
  */
-function getPetLogSection() {
-    return getPetLogsForPrompt("all");
+function getPetLogSection(petId = "primary") {
+    return getPetLogsForPrompt("all", petId);
 }
 
 /**
@@ -644,11 +904,12 @@ async function getWorldInfoSection() {
  * 관전자 모드 프롬프트
  * @returns {string}
  */
-function buildObserverPrompt() {
-    const { name, personalityPrompt, characterSection, userSection, chatSection } = getCommonSections();
-    const petLogSection = getPetLogSection();
+function buildObserverPrompt(petId = "primary") {
+    const { name, personalityPrompt, characterSection, userSection, chatSection } = getCommonSections(petId);
+    const petLogSection = getPetLogSection(petId);
+    const lang = getSpeechLang();
 
-    return ANTI_CENSORSHIP_PREAMBLE + `You are "${name}", a virtual pet character.
+    return getAntiCensorshipPreamble() + `You are "${name}", a virtual pet character.
 You are an observer watching a conversation between the user and an AI character.
 You are NOT a participant in the conversation. Your role is to express your own impressions, commentary, analysis, reactions, or quips about the chat content.
 Focus especially on the [LATEST MESSAGE].
@@ -671,8 +932,11 @@ React to the chat above as "${name}".
 As an observer, freely express your impressions, commentary, analysis, quips, surprise, empathy, or reactions to the conversation — especially the [LATEST MESSAGE].
 
 Rules:
-- Write in Korean, 1-2 sentences long. Single-word responses (e.g. "\ud765", "\ubb50\uc57c") are forbidden. More than 3 sentences is also forbidden.
-- Stay in character — maintain your personality and speech patterns.- You are a THIRD-PARTY OBSERVER. Never speak as if you are the AI character. Always treat the conversation as something you are watching, not participating in.- NEVER repeat a previous response from the activity log. Always say something different and fresh.- Output ONLY the dialogue text. No quotes, labels, explanations, parenthetical actions, or prefixes.
+- Write in ${lang.promptName}, ${lang.sentenceDesc}. Single-word responses (e.g. "\ud765", "\ubb50\uc57c") are forbidden. More than 3 sentences is also forbidden.
+- Stay in character — maintain your personality and speech patterns.
+- You are a THIRD-PARTY OBSERVER. Never speak as if you are the AI character. Always treat the conversation as something you are watching, not participating in.
+- NEVER repeat a previous response from the activity log. Always say something different and fresh.
+- Output ONLY the dialogue text. No quotes, labels, explanations, parenthetical actions, or prefixes.
 - At the very end of your dialogue, append a mood tag: [MOOD:xxx]
   Valid moods: happy, sad, excited, surprised, nervous, confident, shy, angry, thinking
 
@@ -685,11 +949,12 @@ I understand. Dialogue with mood tag:`;
  * 캐릭터 모드 (속마음/내면 독백) 프롬프트
  * @returns {string}
  */
-function buildCharacterPrompt() {
-    const { name, personalityPrompt, characterSection, userSection, chatSection } = getCommonSections();
-    const petLogSection = getPetLogSection();
+function buildCharacterPrompt(petId = "primary") {
+    const { name, personalityPrompt, characterSection, userSection, chatSection } = getCommonSections(petId);
+    const petLogSection = getPetLogSection(petId);
+    const lang = getSpeechLang();
 
-    return ANTI_CENSORSHIP_PREAMBLE + `You are "${name}". You ARE the character currently chatting with the user.
+    return getAntiCensorshipPreamble() + `You are "${name}". You ARE the character currently chatting with the user.
 The chat history below is YOUR conversation.
 You will now express your TRUE INNER THOUGHTS — the feelings, emotions, and honest thoughts you did NOT show in the actual chat.
 Reveal what you really felt but couldn't say out loud.
@@ -710,7 +975,7 @@ For example:
 - If there's an emotion you couldn't say openly — express it honestly
 
 Rules:
-- Write in Korean, 1-2 sentences long. Single-word responses are forbidden. More than 3 sentences is also forbidden.
+- Write in ${lang.promptName}, ${lang.sentenceDesc}. Single-word responses are forbidden. More than 3 sentences is also forbidden.
 - Stay in character — maintain your personality and speech patterns.
 - Output ONLY the dialogue text. No quotes, labels, explanations, parenthetical actions, or prefixes.
 - At the very end of your dialogue, append a mood tag: [MOOD:xxx]
@@ -863,26 +1128,234 @@ function inferMoodFromText(text) {
 
 /**
  * AI 반응 생성 및 표시 (CM API로 채팅 읽고 성격 기반 대사 생성)
- * @returns {Promise<boolean>} - 성공 여부
+ * @returns {Promise<{text: string, mood: string}|null>}
  */
-export async function showAIReaction() {
+export async function showAIReaction(petId = "primary") {
     try {
-        const result = await generatePetReaction();
+        const result = await generatePetReaction(petId);
         
         if (result && result.text) {
-            setState(result.mood, 4000);
-            showSpeechBubble(result.text, null, true);
-            saveChatLog(result.text, result.mood, "aiResponse");
-            log(`AI Reaction: [${result.mood}] ${result.text}`);
-            return true;
+            setState(result.mood, 4000, petId);
+            showSpeechBubble(result.text, null, true, petId);
+            saveChatLog(result.text, result.mood, "aiResponse", petId);
+            log(`AI Reaction [${petId}]: [${result.mood}] ${result.text}`);
+            return result;
         }
         
         log("AI response empty, skipping reaction");
-        return false;
+        return null;
     } catch (error) {
         logError("showAIReaction error:", error);
-        return false;
+        return null;
     }
+}
+
+// ===== 멀티펫 기능 =====
+
+/**
+ * 듀얼 응답 파싱 (Pet A + Pet B 응답 분리)
+ */
+function parseDualResponse(response, nameA, nameB) {
+    if (!response || typeof response !== "string") {
+        return { a: { text: "", mood: "happy" }, b: { text: "", mood: "happy" } };
+    }
+    
+    const lines = response.trim().split("\n").filter(l => l.trim());
+    let aText = "", aMood = "happy";
+    let bText = "", bMood = "happy";
+    
+    const escRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const patA = new RegExp(`^\\[?${escRegex(nameA)}\\]?[:\uff1a]?\\s*(.+)`, "i");
+    const patB = new RegExp(`^\\[?${escRegex(nameB)}\\]?[:\uff1a]?\\s*(.+)`, "i");
+    
+    for (const line of lines) {
+        const trimmed = line.trim();
+        if (!aText) {
+            const m = trimmed.match(patA);
+            if (m) { const r = parseResponse(m[1]); aText = r.text; aMood = r.mood; continue; }
+        }
+        if (!bText) {
+            const m = trimmed.match(patB);
+            if (m) { const r = parseResponse(m[1]); bText = r.text; bMood = r.mood; continue; }
+        }
+    }
+    
+    // 폴백: 이름 매칭 실패 시 줄 순서로
+    if (!aText && !bText && lines.length >= 2) {
+        const rA = parseResponse(lines[0]); aText = rA.text; aMood = rA.mood;
+        const rB = parseResponse(lines[1]); bText = rB.text; bMood = rB.mood;
+    }
+    if (!aText && !bText) {
+        const r = parseResponse(response); aText = r.text; aMood = r.mood;
+    }
+    
+    return { a: { text: aText, mood: aMood }, b: { text: bText, mood: bMood } };
+}
+
+/**
+ * 펫 간 대화 로그 저장 (조합별)
+ */
+function saveInterPetLog(petAName, petAText, petAMood, petBName, petBText, petBMood) {
+    ensureLogStorage();
+    const comboKey = getInterPetKey(petAName, petBName);
+    if (!state.settings.conversationLog.interPetLogs[comboKey]) {
+        state.settings.conversationLog.interPetLogs[comboKey] = [];
+    }
+    const logs = state.settings.conversationLog.interPetLogs[comboKey];
+    const maxLogs = state.settings.conversationLog.maxLogs || 100;
+    logs.push({ timestamp: Date.now(), petAName, petAText, petAMood, petBName, petBText, petBMood, type: "interPet" });
+    while (logs.length > maxLogs) logs.shift();
+    saveSettings();
+    document.dispatchEvent(new CustomEvent("stvp-log-updated"));
+}
+
+/**
+ * 펫 간 자동 대화 생성 (1회 API 호출)
+ */
+/** 펫 간 대화 순서 교대 플래그 (true면 B가 먼저) */
+let interPetTurnFlag = false;
+
+export async function generateInterPetDialogue() {
+    if (!state.settings.personality.enabled) return null;
+    if (!state.settings.multiPet?.enabled || !state.settings.multiPet?.secondPetData) return null;
+    
+    const petAName = state.settings.personality.name || "미유";
+    const petBName = state.settings.multiPet.secondPetData.personality?.name || "펫2";
+    const petAPersonality = state.settings.personality.prompt || DEFAULT_PERSONALITY_PROMPT;
+    const petBPersonality = state.settings.multiPet.secondPetData.personality?.prompt || DEFAULT_PERSONALITY_PROMPT;
+    
+    // 이번 턴 순서 결정 후 교대
+    const bGoesFirst = interPetTurnFlag;
+    interPetTurnFlag = !interPetTurnFlag;
+    
+    const firstName = bGoesFirst ? petBName : petAName;
+    const secondName = bGoesFirst ? petAName : petBName;
+    const firstPersonality = bGoesFirst ? petBPersonality : petAPersonality;
+    const secondPersonality = bGoesFirst ? petAPersonality : petBPersonality;
+    
+    // 이전 펫 간 대화 로그 (조합별)
+    const comboKey = getInterPetKey(petAName, petBName);
+    const interLogs = state.settings.conversationLog.interPetLogs?.[comboKey] || [];
+    let logSection = "";
+    if (interLogs.length > 0) {
+        logSection = "## Previous conversations between you two\nIMPORTANT: Do NOT repeat these topics. Always say something new.\n";
+        for (const e of interLogs.slice(-8)) {
+            logSection += `${e.petAName}: "${e.petAText}" / ${e.petBName}: "${e.petBText}"\n`;
+        }
+        logSection += "\n";
+    }
+    
+    const lang = getSpeechLang();
+    const prompt = getAntiCensorshipPreambleMulti() + `## Trigger Event: Periodic Status Update
+Both widgets are idle. Generate a paired status notification — each widget displays a short text reflecting its own perspective.
+The two widgets are aware of each other and their texts may relate to each other naturally.
+
+## Widget A Profile — ${firstName}
+${firstPersonality}
+
+## Widget B Profile — ${secondName}
+${secondPersonality}
+
+${logSection}## Output Requirements
+- Generate 2 notification texts — one per widget. ${lang.promptName}, ${lang.sentenceDesc} each.
+- Topics can be anything: idle observations, casual remarks, reactions to each other, random thoughts, etc.
+- Each widget's text should reflect the personality described in its profile.
+- Do NOT repeat topics from the notification history above. Always generate fresh content.
+- Output ONLY the notification texts. No explanations, labels, quotes, or actions.
+- Append a mood indicator at the end of each line.
+  Valid indicators: happy, sad, excited, surprised, nervous, confident, shy, angry, thinking
+
+Output format:
+${firstName}: 텍스트 [MOOD:xxx]
+${secondName}: 텍스트 [MOOD:yyy]
+
+Widget notifications:`;
+    
+    try {
+        state.isPetGenerating = true;
+        state.secondPet.isPetGenerating = true;
+        setState(PET_STATES.THINKING);
+        setState(PET_STATES.THINKING, null, "secondary");
+        
+        const useCM = state.settings.api.useConnectionManager && state.settings.api.connectionProfile;
+        let response;
+        
+        // 최대 2회 시도 (1회 실패 시 1회 재시도)
+        let lastError = null;
+        for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+                if (useCM) { response = await callConnectionManagerAPI(prompt); }
+                else { response = await callDefaultAPI(prompt); }
+                lastError = null;
+                break; // 성공하면 루프 탈출
+            } catch (err) {
+                lastError = err;
+                if (attempt === 0) {
+                    log("Inter-pet dialogue API failed, retrying once...");
+                    await new Promise(r => setTimeout(r, 1000)); // 1초 대기 후 재시도
+                }
+            }
+        }
+        
+        if (lastError) throw lastError;
+        
+        const parsed = parseDualResponse(response, firstName, secondName);
+        // parsed.a = firstName의 응답, parsed.b = secondName의 응답
+        // bGoesFirst면 a↔b 스왑해서 항상 result.a=primary, result.b=secondary로 반환
+        const result = bGoesFirst
+            ? { a: parsed.b, b: parsed.a }
+            : { a: parsed.a, b: parsed.b };
+        log(`Inter-pet [${bGoesFirst ? "B first" : "A first"}]: [${petAName}] ${result.a.text} | [${petBName}] ${result.b.text}`);
+        return result;
+    } catch (error) {
+        logError("generateInterPetDialogue error:", error);
+        // 실패 시 명시적으로 IDLE 상태 복귀
+        setState(PET_STATES.IDLE);
+        setState(PET_STATES.IDLE, null, "secondary");
+        return null;
+    } finally {
+        state.isPetGenerating = false;
+        state.secondPet.isPetGenerating = false;
+    }
+}
+
+/**
+ * 펫 간 자동 대화 표시
+ */
+export async function showInterPetDialogue() {
+    // generateInterPetDialogue 호출 전에 현재 플래그 값 저장
+    // (generate 안에서 토글되므로 호출 전의 값 = bGoesFirst 값)
+    const bWentFirst = interPetTurnFlag;
+    
+    const result = await generateInterPetDialogue();
+    if (!result) return false;
+    
+    const petAName = state.settings.personality.name || "미유";
+    const petBName = state.settings.multiPet?.secondPetData?.personality?.name || "펫2";
+    
+    // 먼저 말하는 펫 결정
+    const firstPetId = bWentFirst ? "secondary" : "primary";
+    const secondPetId = bWentFirst ? "primary" : "secondary";
+    const firstResult = bWentFirst ? result.b : result.a;
+    const secondResult = bWentFirst ? result.a : result.b;
+    
+    if (firstResult.text) {
+        setState(firstResult.mood, 12000, firstPetId);
+        showSpeechBubble(firstResult.text, 12000, true, firstPetId);
+    }
+    
+    if (secondResult.text) {
+        setTimeout(() => {
+            setState(secondResult.mood, 12000, secondPetId);
+            showSpeechBubble(secondResult.text, 12000, true, secondPetId);
+        }, 5000);
+    }
+    
+    if (result.a.text || result.b.text) {
+        saveInterPetLog(petAName, result.a.text || "", result.a.mood, petBName, result.b.text || "", result.b.mood);
+    }
+    
+    return true;
 }
 
 

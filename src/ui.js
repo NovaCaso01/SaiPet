@@ -2,12 +2,13 @@
  * SaiPet - 설정 UI
  */
 
-import { EXTENSION_NAME, MOOD_LABELS, POSITION_PRESETS, DEFAULT_SPEECHES, BUBBLE_DESIGNS, FONT_LIST } from "./constants.js";
+import { EXTENSION_NAME, MOOD_LABELS, POSITION_PRESETS, DEFAULT_SPEECHES, BUBBLE_DESIGNS, FONT_LIST, SPEECH_LANGUAGES } from "./constants.js";
 import { state, log } from "./state.js";
 import { saveSettings, fileToBase64, savePreset, loadPreset, deletePreset, updatePreset, getPresetList, resetToDefaultMiyu, exportPreset, importPreset, resetAllSettings } from "./storage.js";
-import { createPetContainer, removePetContainer, updatePetPosition, updatePetSize, updatePetOpacity, updatePetSprite, applyDesignTheme, startWalking, stopWalking } from "./pet-core.js";
+import { createPetContainer, removePetContainer, updatePetPosition, updatePetSize, updatePetOpacity, updatePetSprite, applyDesignTheme, startWalking, stopWalking, createSecondPetContainer, removeSecondPetContainer, startSecondPetWalking, stopSecondPetWalking } from "./pet-core.js";
 import { extension_settings } from "../../../../extensions.js";
 import { getLogs, clearLogs, deleteLogEntry } from "./pet-ai.js";
+import { loadSecondPet, unloadSecondPet } from "./storage.js";
 
 // 대화 로그 페이지네이션 상태
 const LOG_PAGE_SIZE = 10;
@@ -62,6 +63,8 @@ export async function createUI() {
         // 컨디션
         feeding: "밥먹을때",
         hungry: "배고플때",
+        // 멀티펫
+        collision: "충돌시 (멀티펫)",
     };
     const speechSettingsHtml = Object.entries(speechLabels)
         .map(([id, label]) => createSpeechSettingHtml(id, label))
@@ -76,28 +79,27 @@ export async function createUI() {
             </div>
             <div class="inline-drawer-content">
                 
-                <!-- ━━━ 기본 ON/OFF ━━━ -->
-                <div class="stvp-section">
-                    <div class="stvp-row">
-                        <label>활성화</label>
+                <!-- ━━━ ON/OFF 토글 (항상 표시) ━━━ -->
+                <div class="stvp-section stvp-header-toggle">
+                    <div class="stvp-row" style="margin-bottom:0;">
+                        <label><i class="fa-solid fa-power-off"></i> 활성화</label>
                         <input type="checkbox" id="stvp-enabled">
                         <label class="stvp-toggle" for="stvp-enabled"></label>
                     </div>
-                    <div class="stvp-info" style="margin-bottom:0;">
+                    <div class="stvp-info" style="margin-bottom:0; margin-top:4px;">
                         <small><i class="fa-solid fa-mobile-screen"></i> 스마트폰에서는 자동으로 비활성화됩니다 (태블릿은 사용 가능).</small>
                     </div>
                 </div>
 
                 <!-- ━━━ 탭 메뉴 ━━━ -->
                 <div class="stvp-tab-bar">
-                    <button class="stvp-tab-btn active" data-tab="basic"><i class="fa-solid fa-paw"></i> 기본</button>
-                    <button class="stvp-tab-btn" data-tab="visual"><i class="fa-solid fa-palette"></i> 외형</button>
-                    <button class="stvp-tab-btn" data-tab="chat"><i class="fa-solid fa-comment"></i> 대화</button>
+                    <button class="stvp-tab-btn active" data-tab="preset"><i class="fa-solid fa-paw"></i> 프리셋</button>
+                    <button class="stvp-tab-btn" data-tab="settings"><i class="fa-solid fa-gear"></i> 설정</button>
                     <button class="stvp-tab-btn" data-tab="log"><i class="fa-solid fa-clipboard-list"></i> 로그</button>
                 </div>
 
-                <!-- ══════ 탭1: 기본 ══════ -->
-                <div class="stvp-tab-content active" data-tab="basic">
+                <!-- ══════ 탭1: 프리셋 ══════ -->
+                <div class="stvp-tab-content active" data-tab="preset">
 
                     <!-- 프리셋 관리 -->
                     <div class="stvp-section">
@@ -156,11 +158,6 @@ export async function createUI() {
                         </div>
                     </div>
 
-                </div>
-
-                <!-- ══════ 탭2: 외형 ══════ -->
-                <div class="stvp-tab-content" data-tab="visual">
-
                     <!-- 외형 -->
                     <div class="stvp-section">
                         <h5><i class="fa-solid fa-palette"></i> 외형</h5>
@@ -172,11 +169,6 @@ export async function createUI() {
                             <label>좌우 반전</label>
                             <input type="checkbox" id="stvp-flip">
                             <label class="stvp-toggle" for="stvp-flip"></label>
-                        </div>
-                        <div class="stvp-row">
-                            <label>투명도</label>
-                            <input type="range" id="stvp-opacity" min="10" max="100" step="5">
-                            <span id="stvp-opacity-label">100</span>%
                         </div>
 
                         <div class="stvp-subsection">
@@ -204,46 +196,9 @@ export async function createUI() {
                         </div>
                     </div>
 
-                    <!-- 위치 -->
+                    <!-- 말풍선 디자인 -->
                     <div class="stvp-section">
-                        <h5><i class="fa-solid fa-location-dot"></i> 위치</h5>
-                        <div class="stvp-row">
-                            <label>위치 프리셋</label>
-                            <select id="stvp-position" class="text_pole">
-                                ${positionPresetOptions}
-                            </select>
-                        </div>
-                        <div class="stvp-row">
-                            <label>드래그 이동</label>
-                            <input type="checkbox" id="stvp-draggable">
-                            <label class="stvp-toggle" for="stvp-draggable"></label>
-                        </div>
-                        
-                        <hr class="stvp-divider">
-                        <label class="stvp-subsection-title"><i class="fa-solid fa-person-walking"></i> 걷기</label>
-                        <div class="stvp-info" style="margin-bottom:4px;">
-                            <small><i class="fa-solid fa-lightbulb"></i> 펫이 주변을 천천히 돌아다닙니다. 잠자기/드래그 중에는 멈춥니다</small>
-                        </div>
-                        <div class="stvp-row" style="margin-top:4px;">
-                            <label>걷기 사용</label>
-                            <input type="checkbox" id="stvp-walk-enabled">
-                            <label class="stvp-toggle" for="stvp-walk-enabled"></label>
-                        </div>
-                    </div>
-
-                </div>
-
-                <!-- ══════ 탭3: 대화 ══════ -->
-                <div class="stvp-tab-content" data-tab="chat">
-
-                    <!-- 말풍선 -->
-                    <div class="stvp-section">
-                        <h5><i class="fa-solid fa-comment"></i> 말풍선</h5>
-                        <div class="stvp-row">
-                            <label>활성화</label>
-                            <input type="checkbox" id="stvp-bubble-enabled">
-                            <label class="stvp-toggle" for="stvp-bubble-enabled"></label>
-                        </div>
+                        <h5><i class="fa-solid fa-comment"></i> 말풍선 디자인</h5>
                         <div class="stvp-row">
                             <label>디자인</label>
                             <select id="stvp-bubble-design" class="text_pole">
@@ -260,10 +215,6 @@ export async function createUI() {
                             <label>최대 너비</label>
                             <input type="range" id="stvp-bubble-max-width" min="120" max="600" step="10">
                             <span id="stvp-bubble-max-width-label">360</span>px
-                        </div>
-                        <div class="stvp-row">
-                            <label>표시 시간 (ms)</label>
-                            <input type="number" id="stvp-bubble-duration" class="text_pole" min="1000" max="30000" step="500">
                         </div>
                         <hr class="stvp-divider">
                         <label class="stvp-subsection-title"><i class="fa-solid fa-droplet"></i> 색상</label>
@@ -282,16 +233,6 @@ export async function createUI() {
                         <div class="stvp-info" style="margin-bottom:0;">
                             <small><i class="fa-solid fa-palette"></i> 강조색은 게이지바, 버튼, 입력창에 적용됩니다</small>
                         </div>
-                        <hr class="stvp-divider">
-                        <label class="stvp-subsection-title"><i class="fa-solid fa-comment-slash"></i> 폴백 대사</label>
-                        <div class="stvp-row" style="margin-top:6px;">
-                            <label>응답 실패 시 대사</label>
-                            <input type="text" id="stvp-fallback-no-response" class="text_pole" placeholder="...뭐라고?">
-                        </div>
-                        <div class="stvp-row">
-                            <label>API 오류 시 대사</label>
-                            <input type="text" id="stvp-fallback-api-error" class="text_pole" placeholder="...잘 안 들렸어.">
-                        </div>
                     </div>
 
                     <!-- 커스텀 대사 -->
@@ -302,6 +243,78 @@ export async function createUI() {
                         </div>
                         <div class="stvp-speeches-container">
                             ${speechSettingsHtml}
+                        </div>
+                    </div>
+
+                    <!-- 폴백 대사 -->
+                    <div class="stvp-section">
+                        <h5><i class="fa-solid fa-comment-slash"></i> 폴백 대사</h5>
+                        <div class="stvp-row">
+                            <label>응답 실패 시 대사</label>
+                            <input type="text" id="stvp-fallback-no-response" class="text_pole" placeholder="...뭐라고?">
+                        </div>
+                        <div class="stvp-row">
+                            <label>API 오류 시 대사</label>
+                            <input type="text" id="stvp-fallback-api-error" class="text_pole" placeholder="...잘 안 들렸어.">
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- ══════ 탭2: 설정 ══════ -->
+                <div class="stvp-tab-content" data-tab="settings">
+
+                    <!-- 공통 설정 (양쪽 펫 적용) -->
+                    <div class="stvp-section">
+                        <h5><i class="fa-solid fa-sliders"></i> 공통 설정</h5>
+                        <div class="stvp-info" style="margin-bottom:6px;">
+                            <small><i class="fa-solid fa-circle-info"></i> 멀티펫 사용 시 양쪽 펫 모두에게 적용됩니다</small>
+                        </div>
+                        <div class="stvp-row">
+                            <label>말투 언어</label>
+                            <select id="stvp-speech-language" class="text_pole">
+                                ${Object.entries(SPEECH_LANGUAGES).map(([id, d]) => `<option value="${id}">${d.label}</option>`).join("")}
+                            </select>
+                        </div>
+                        <div class="stvp-row">
+                            <label>투명도</label>
+                            <input type="range" id="stvp-opacity" min="10" max="100" step="5">
+                            <span id="stvp-opacity-label">100</span>%
+                        </div>
+                        <div class="stvp-row">
+                            <label>말풍선 ON/OFF</label>
+                            <input type="checkbox" id="stvp-bubble-enabled">
+                            <label class="stvp-toggle" for="stvp-bubble-enabled"></label>
+                        </div>
+                        <div class="stvp-row">
+                            <label>말풍선 표시 시간 (ms)</label>
+                            <input type="number" id="stvp-bubble-duration" class="text_pole" min="1000" max="30000" step="500">
+                        </div>
+                    </div>
+
+                    <!-- 위치 -->
+                    <div class="stvp-section">
+                        <h5><i class="fa-solid fa-location-dot"></i> 위치</h5>
+                        <div class="stvp-row">
+                            <label>위치 프리셋</label>
+                            <select id="stvp-position" class="text_pole">
+                                ${positionPresetOptions}
+                            </select>
+                        </div>
+                        <div class="stvp-row">
+                            <label>드래그 이동</label>
+                            <input type="checkbox" id="stvp-draggable">
+                            <label class="stvp-toggle" for="stvp-draggable"></label>
+                        </div>
+                        <hr class="stvp-divider">
+                        <label class="stvp-subsection-title"><i class="fa-solid fa-person-walking"></i> 걷기</label>
+                        <div class="stvp-info" style="margin-bottom:4px;">
+                            <small><i class="fa-solid fa-lightbulb"></i> 펫이 주변을 천천히 돌아다닙니다. 잠자기/드래그 중에는 멈춥니다</small>
+                        </div>
+                        <div class="stvp-row" style="margin-top:4px;">
+                            <label>걷기 사용</label>
+                            <input type="checkbox" id="stvp-walk-enabled">
+                            <label class="stvp-toggle" for="stvp-walk-enabled"></label>
                         </div>
                     </div>
 
@@ -370,9 +383,92 @@ export async function createUI() {
                         </div>
                     </div>
 
+                    <!-- 멀티펫 -->
+                    <div class="stvp-section">
+                        <h5><i class="fa-solid fa-cat"></i> 멀티펫</h5>
+                        <div class="stvp-info" style="margin-bottom:6px;">
+                            <small><i class="fa-solid fa-circle-info"></i> 저장된 프리셋 중 하나를 2번째 펫으로 불러옵니다 (최대 2마리)</small>
+                        </div>
+                        <div class="stvp-row">
+                            <label>멀티펫 사용</label>
+                            <input type="checkbox" id="stvp-multi-enabled">
+                            <label class="stvp-toggle" for="stvp-multi-enabled"></label>
+                        </div>
+                        <div id="stvp-multi-settings" class="stvp-subsection">
+                            <div class="stvp-row" style="margin-top:6px;">
+                                <label>2번째 펫 프리셋</label>
+                                <select id="stvp-multi-preset" class="text_pole">
+                                    <option value="">-- 선택 --</option>
+                                </select>
+                            </div>
+                            <div class="stvp-row">
+                                <button class="menu_button" id="stvp-multi-load" style="width:100%;"><i class="fa-solid fa-paw"></i> 2번째 펫 불러오기</button>
+                            </div>
+                            <div class="stvp-row">
+                                <button class="menu_button" id="stvp-multi-unload" style="width:100%; background: rgba(255, 80, 80, 0.12); border-color: rgba(255, 80, 80, 0.25);"><i class="fa-solid fa-xmark"></i> 2번째 펫 해제</button>
+                            </div>
+                            <div id="stvp-multi-current-info" class="stvp-info" style="margin-top:4px; display:none;">
+                                <small><i class="fa-solid fa-paw"></i> 현재 2번째 펫: <b id="stvp-multi-current-name">없음</b></small>
+                            </div>
+
+                            <hr class="stvp-divider">
+                            <label class="stvp-subsection-title"><i class="fa-solid fa-bolt"></i> 채팅 반응</label>
+                            <div class="stvp-info" style="margin-top:4px; margin-bottom:6px;">
+                                <small><i class="fa-solid fa-circle-info"></i> AI 채팅에 어떤 펫이 반응할지 설정합니다</small>
+                            </div>
+                            <div class="stvp-row">
+                                <label>반응할 펫</label>
+                                <select id="stvp-multi-chat-reactor" class="text_pole">
+                                    <option value="primary">1번째 펫만</option>
+                                    <option value="secondary">2번째 펫만</option>
+                                    <option value="alternate">번갈아가며</option>
+                                </select>
+                            </div>
+
+                            <hr class="stvp-divider">
+                            <label class="stvp-subsection-title"><i class="fa-solid fa-comments"></i> 직접 대화 듀얼 반응</label>
+                            <div class="stvp-info" style="margin-top:4px; margin-bottom:6px;">
+                                <small><i class="fa-solid fa-circle-info"></i> 유저가 직접 대화할 때 두 펫 모두 반응합니다 (1회 API 호출)</small>
+                            </div>
+                            <div class="stvp-row">
+                                <label>듀얼 반응</label>
+                                <input type="checkbox" id="stvp-multi-dual-talk">
+                                <label class="stvp-toggle" for="stvp-multi-dual-talk"></label>
+                            </div>
+
+                            <hr class="stvp-divider">
+                            <label class="stvp-subsection-title"><i class="fa-solid fa-location-dot"></i> 2번째 펫 위치</label>
+                            <div class="stvp-info" style="margin-top:4px; margin-bottom:6px;">
+                                <small><i class="fa-solid fa-circle-info"></i> 2번째 펫의 기본 위치 프리셋 (드래그 시 무시됨)</small>
+                            </div>
+                            <div class="stvp-row">
+                                <label>위치 프리셋</label>
+                                <select id="stvp-multi-position" class="text_pole">
+                                    ${positionPresetOptions}
+                                </select>
+                            </div>
+
+                            <hr class="stvp-divider">
+                            <label class="stvp-subsection-title"><i class="fa-solid fa-rotate"></i> 펫끼리 자동 대화</label>
+                            <div class="stvp-info" style="margin-top:4px; margin-bottom:6px;">
+                                <small><i class="fa-solid fa-circle-info"></i> 두 펫이 주기적으로 자동 대화합니다 (1회 API 호출). 로그에 기록되며 펫이 기억합니다</small>
+                            </div>
+                            <div class="stvp-row">
+                                <label>자동 대화</label>
+                                <input type="checkbox" id="stvp-multi-interpet-enabled">
+                                <label class="stvp-toggle" for="stvp-multi-interpet-enabled"></label>
+                            </div>
+                            <div class="stvp-row">
+                                <label>대화 간격 (분)</label>
+                                <input type="range" id="stvp-multi-interpet-interval" min="1" max="30" step="1">
+                                <span id="stvp-multi-interpet-interval-label">5</span>분
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
 
-                <!-- ══════ 탭4: 로그 ══════ -->
+                <!-- ══════ 탭3: 로그 ══════ -->
                 <div class="stvp-tab-content" data-tab="log">
 
                     <div class="stvp-section">
@@ -383,6 +479,7 @@ export async function createUI() {
                                 <option value="all">전체</option>
                                 <option value="direct">직접 대화만</option>
                                 <option value="chat">현재 채팅방 반응만</option>
+                                <option value="interPet">펫끼리 대화만</option>
                             </select>
                         </div>
                         <hr class="stvp-divider">
@@ -723,6 +820,10 @@ function bindUIEvents() {
         saveSettings();
         if (state.settings.enabled) {
             createPetContainer();
+            // 공통 설정: 2번째 펫도 드래그 재적용
+            if (state.settings.multiPet?.enabled && state.settings.multiPet?.secondPetData) {
+                createSecondPetContainer();
+            }
         }
     });
 
@@ -735,8 +836,13 @@ function bindUIEvents() {
         saveSettings();
         if (this.checked) {
             startWalking();
+            // 공통 설정: 2번째 펫도 걷기 적용
+            if (state.settings.multiPet?.enabled && state.settings.multiPet?.secondPetData) {
+                startSecondPetWalking();
+            }
         } else {
             stopWalking();
+            stopSecondPetWalking();
         }
     });
 
@@ -916,6 +1022,12 @@ function bindUIEvents() {
         saveSettings();
     });
 
+    // 말투 언어
+    $("#stvp-speech-language").on("change", function() {
+        state.settings.speechLanguage = this.value;
+        saveSettings();
+    });
+
     $("#stvp-bubble-bg").on("change", function() {
         state.settings.speechBubble.backgroundColor = this.value;
         saveSettings();
@@ -993,6 +1105,99 @@ function bindUIEvents() {
             refreshLogViewer();
         }
     });
+
+    // === 멀티펫 ===
+    $("#stvp-multi-enabled").on("change", function() {
+        if (!state.settings.multiPet) {
+            state.settings.multiPet = { enabled: false, secondPetPresetId: null, chatReactor: "primary", interPetChat: { enabled: false, interval: 5 }, dualDirectTalk: false, secondPetData: null, secondPetCondition: { hunger: 100, lastFed: null }, secondPetPosition: { customX: null, customY: null } };
+        }
+        state.settings.multiPet.enabled = this.checked;
+        saveSettings();
+        toggleMultiPetSettings(this.checked);
+        
+        if (this.checked && state.settings.multiPet.secondPetData) {
+            createSecondPetContainer();
+            import("./pet-reactions.js").then(({ restartInterPetChatTimer }) => restartInterPetChatTimer());
+        } else {
+            removeSecondPetContainer();
+            import("./pet-reactions.js").then(({ restartInterPetChatTimer }) => restartInterPetChatTimer());
+        }
+    });
+
+    $("#stvp-multi-load").on("click", function() {
+        const presetId = $("#stvp-multi-preset").val();
+        if (!presetId) {
+            alert("불러올 프리셋을 선택하세요.");
+            return;
+        }
+        
+        if (loadSecondPet(presetId)) {
+            updateMultiPetInfo();
+            if (state.settings.multiPet.enabled) {
+                createSecondPetContainer();
+            }
+            alert("2번째 펫을 불러왔습니다!");
+        }
+    });
+
+    $("#stvp-multi-unload").on("click", function() {
+        if (!state.settings.multiPet?.secondPetData) {
+            alert("해제할 2번째 펫이 없습니다.");
+            return;
+        }
+        if (confirm("2번째 펫을 해제하시겠습니까?")) {
+            removeSecondPetContainer();
+            unloadSecondPet();
+            updateMultiPetInfo();
+            alert("2번째 펫이 해제되었습니다.");
+        }
+    });
+
+    $("#stvp-multi-chat-reactor").on("change", function() {
+        if (!state.settings.multiPet) return;
+        state.settings.multiPet.chatReactor = this.value;
+        saveSettings();
+    });
+
+    $("#stvp-multi-dual-talk").on("change", function() {
+        if (!state.settings.multiPet) return;
+        state.settings.multiPet.dualDirectTalk = this.checked;
+        saveSettings();
+    });
+
+    // 2번째 펫 위치 프리셋
+    $("#stvp-multi-position").on("change", function() {
+        if (!state.settings.multiPet) return;
+        if (!state.settings.multiPet.secondPetPosition) {
+            state.settings.multiPet.secondPetPosition = { customX: null, customY: null, location: "bottom-left" };
+        }
+        state.settings.multiPet.secondPetPosition.location = this.value;
+        state.settings.multiPet.secondPetPosition.customX = null;
+        state.settings.multiPet.secondPetPosition.customY = null;
+        saveSettings();
+        import("./pet-core.js").then(({ updateSecondPetPosition }) => {
+            if (typeof updateSecondPetPosition === "function") updateSecondPetPosition();
+        });
+    });
+
+    $("#stvp-multi-interpet-enabled").on("change", function() {
+        if (!state.settings.multiPet) return;
+        if (!state.settings.multiPet.interPetChat) {
+            state.settings.multiPet.interPetChat = { enabled: false, interval: 5 };
+        }
+        state.settings.multiPet.interPetChat.enabled = this.checked;
+        saveSettings();
+        import("./pet-reactions.js").then(({ restartInterPetChatTimer }) => restartInterPetChatTimer());
+    });
+
+    $("#stvp-multi-interpet-interval").on("input", function() {
+        $("#stvp-multi-interpet-interval-label").text(this.value);
+    }).on("change", function() {
+        if (!state.settings.multiPet?.interPetChat) return;
+        state.settings.multiPet.interPetChat.interval = parseInt(this.value) || 5;
+        saveSettings();
+        import("./pet-reactions.js").then(({ restartInterPetChatTimer }) => restartInterPetChatTimer());
+    });
 }
 
 /**
@@ -1026,7 +1231,8 @@ function refreshLogViewer() {
     
     let html = "";
     
-    for (const entry of pageItems) {
+    for (let i = 0; i < pageItems.length; i++) {
+        const entry = pageItems[i];
         const date = new Date(entry.timestamp);
         const timeStr = date.toLocaleString("ko-KR", {
             month: "short", day: "numeric",
@@ -1035,14 +1241,50 @@ function refreshLogViewer() {
         const moodEmoji = getMoodEmoji(entry.mood);
         
         if (entry.type === "direct") {
+            // 듀얼 직접대화 그룹핑: 같은 userText + 가까운 타임스탬프 + 둘 다 dual
+            if (entry.mode === "dual" && i + 1 < pageItems.length) {
+                const next = pageItems[i + 1];
+                if (next.type === "direct" && next.mode === "dual" &&
+                    next.userText === entry.userText &&
+                    Math.abs(next.timestamp - entry.timestamp) < 15000) {
+                    // 시간순 정렬 (먼저 응답한 펫이 위에)
+                    const [first, second] = entry.timestamp <= next.timestamp ? [entry, next] : [next, entry];
+                    const moodA = getMoodEmoji(first.mood);
+                    const moodB = getMoodEmoji(second.mood);
+                    html += `<div class="stvp-log-entry stvp-log-direct stvp-log-dual" data-timestamp="${entry.timestamp}" data-timestamp2="${next.timestamp}" data-type="direct">
+                        <div class="stvp-log-header">
+                            <span class="stvp-log-time"><i class="fa-regular fa-clock"></i> ${timeStr}</span>
+                            <span class="stvp-log-badge stvp-log-badge-dual"><i class="fa-solid fa-comments"></i> 듀얼 직접대화</span>
+                            <button class="stvp-log-delete-btn" title="이 로그 삭제"><i class="fa-solid fa-xmark"></i></button>
+                        </div>
+                        <div class="stvp-log-user"><i class="fa-solid fa-user"></i> ${escapeHtml(first.userText)}</div>
+                        <div class="stvp-log-pet"><i class="fa-solid fa-paw"></i> <b>${escapeHtml(first.speaker || "펫")}</b> ${moodA}: ${escapeHtml(first.petResponse)}</div>
+                        <div class="stvp-log-pet"><i class="fa-solid fa-paw"></i> <b>${escapeHtml(second.speaker || "펫")}</b> ${moodB}: ${escapeHtml(second.petResponse)}</div>
+                    </div>`;
+                    i++; // 다음 엔트리 스킵 (이미 그룹에 포함됨)
+                    continue;
+                }
+            }
+            // 단일 직접대화 또는 짝 없는 듀얼 엔트리
+            const speakerPrefix = entry.mode === "dual" ? `<b>${escapeHtml(entry.speaker || "펫")}</b> ` : "";
             html += `<div class="stvp-log-entry stvp-log-direct" data-timestamp="${entry.timestamp}" data-type="direct">
                 <div class="stvp-log-header">
                     <span class="stvp-log-time"><i class="fa-regular fa-clock"></i> ${timeStr}</span>
-                    <span class="stvp-log-badge stvp-log-badge-direct"><i class="fa-solid fa-comment"></i> 직접대화</span>
+                    <span class="stvp-log-badge stvp-log-badge-direct"><i class="fa-solid fa-comment"></i> 직접대화 ${moodEmoji}</span>
                     <button class="stvp-log-delete-btn" title="이 로그 삭제"><i class="fa-solid fa-xmark"></i></button>
                 </div>
                 <div class="stvp-log-user"><i class="fa-solid fa-user"></i> ${escapeHtml(entry.userText)}</div>
-                <div class="stvp-log-pet"><i class="fa-solid fa-paw"></i> ${escapeHtml(entry.petResponse)}</div>
+                <div class="stvp-log-pet"><i class="fa-solid fa-paw"></i> ${speakerPrefix}${escapeHtml(entry.petResponse)}</div>
+            </div>`;
+        } else if (entry.type === "interPet") {
+            html += `<div class="stvp-log-entry stvp-log-interpet" data-timestamp="${entry.timestamp}" data-type="interPet">
+                <div class="stvp-log-header">
+                    <span class="stvp-log-time"><i class="fa-regular fa-clock"></i> ${timeStr}</span>
+                    <span class="stvp-log-badge stvp-log-badge-interpet"><i class="fa-solid fa-rotate"></i> 펫끼리 대화</span>
+                    <button class="stvp-log-delete-btn" title="이 로그 삭제"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="stvp-log-pet"><i class="fa-solid fa-paw"></i> <b>${escapeHtml(entry.petAName)}</b>: ${escapeHtml(entry.petAText)}</div>
+                <div class="stvp-log-pet"><i class="fa-solid fa-paw"></i> <b>${escapeHtml(entry.petBName)}</b>: ${escapeHtml(entry.petBText)}</div>
             </div>`;
         } else {
             const triggerLabel = getTriggerLabel(entry.trigger);
@@ -1065,9 +1307,11 @@ function refreshLogViewer() {
             e.stopPropagation();
             const entry = this.closest(".stvp-log-entry");
             const timestamp = parseInt(entry.dataset.timestamp);
+            const timestamp2 = entry.dataset.timestamp2 ? parseInt(entry.dataset.timestamp2) : null;
             const type = entry.dataset.type;
             
             deleteLogEntry(timestamp, type);
+            if (timestamp2) deleteLogEntry(timestamp2, type);
             
             // 삭제 애니메이션 후 새로고침
             entry.style.transition = "opacity 0.2s, transform 0.2s";
@@ -1118,6 +1362,7 @@ function getTriggerLabel(trigger) {
         longAbsence: "오랜만에",
         feeding: "밥주기",
         hungry: "배고픔",
+        interPet: "펫끼리 대화",
     };
     return labels[trigger] || trigger;
 }
@@ -1218,6 +1463,20 @@ function updateUIValues() {
     $("#stvp-bubble-accent-color").val(s.speechBubble.accentColor || "#7c9bff");
     $("#stvp-fallback-no-response").val(s.fallbackMessages?.noResponse || "");
     $("#stvp-fallback-api-error").val(s.fallbackMessages?.apiError || "");
+    $("#stvp-speech-language").val(s.speechLanguage || "ko");
+    
+    // 멀티펫
+    const mp = s.multiPet || {};
+    $("#stvp-multi-enabled").prop("checked", mp.enabled || false);
+    $("#stvp-multi-chat-reactor").val(mp.chatReactor || "primary");
+    $("#stvp-multi-dual-talk").prop("checked", mp.dualDirectTalk || false);
+    $("#stvp-multi-interpet-enabled").prop("checked", mp.interPetChat?.enabled || false);
+    $("#stvp-multi-interpet-interval").val(mp.interPetChat?.interval || 5);
+    $("#stvp-multi-interpet-interval-label").text(mp.interPetChat?.interval || 5);
+    $("#stvp-multi-position").val(mp.secondPetPosition?.location || "bottom-left");
+    toggleMultiPetSettings(mp.enabled || false);
+    updateMultiPetPresetList();
+    updateMultiPetInfo();
     
     // 대화 로그
     refreshLogViewer();
@@ -1244,6 +1503,9 @@ function updatePresetList() {
     if (state.settings.currentPresetId) {
         $select.val(state.settings.currentPresetId);
     }
+    
+    // 멀티펫 프리셋 목록도 업데이트
+    updateMultiPetPresetList();
 }
 
 /**
@@ -1265,5 +1527,52 @@ function toggleCMProfile(show) {
         $("#stvp-cm-profile-row").show();
     } else {
         $("#stvp-cm-profile-row").hide();
+    }
+}
+/**
+ * 멀티펫 설정 섹션 토글
+ */
+function toggleMultiPetSettings(show) {
+    if (show) {
+        $("#stvp-multi-settings").slideDown(200);
+    } else {
+        $("#stvp-multi-settings").slideUp(200);
+    }
+}
+
+/**
+ * 멀티펫 프리셋 목록 업데이트 (현재 메인 펫 프리셋 제외)
+ */
+function updateMultiPetPresetList() {
+    const presets = getPresetList();
+    const $select = $("#stvp-multi-preset");
+    
+    $select.empty();
+    $select.append('<option value="">-- 선택 --</option>');
+    
+    presets.forEach(preset => {
+        // 현재 사용 중인 프리셋은 제외
+        if (preset.id === state.settings.currentPresetId) return;
+        $select.append(`<option value="${preset.id}">${preset.name}</option>`);
+    });
+    
+    // 현재 선택된 2번째 프리셋 표시
+    if (state.settings.multiPet?.secondPetPresetId) {
+        $select.val(state.settings.multiPet.secondPetPresetId);
+    }
+}
+
+/**
+ * 멀티펫 현재 정보 업데이트
+ */
+function updateMultiPetInfo() {
+    const data = state.settings.multiPet?.secondPetData;
+    if (data) {
+        const name = data.personality?.name || "이름없음";
+        $("#stvp-multi-current-name").text(name);
+        $("#stvp-multi-current-info").show();
+    } else {
+        $("#stvp-multi-current-name").text("없음");
+        $("#stvp-multi-current-info").hide();
     }
 }

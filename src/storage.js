@@ -430,6 +430,7 @@ export function resetToDefaultMiyu() {
         longAbsence: [],
         feeding: [],
         hungry: [],
+        collision: [],
     };
     
     // 기본 이름과 성격 복원
@@ -471,11 +472,62 @@ export function resetAllSettings() {
     
     saveSettings();
     
-    // 스프라이트 업데이트
-    import("./pet-core.js").then(({ updatePetSprite, updatePetSize, updatePetPosition, updatePetOpacity }) => {
+    // 2번째 펫 DOM 제거 + 걷기 타이머 정리
+    import("./pet-core.js").then(({ updatePetSprite, updatePetSize, updatePetPosition, updatePetOpacity, removeSecondPetContainer }) => {
+        removeSecondPetContainer();
         updatePetSprite();
         updatePetSize();
         updatePetPosition();
         updatePetOpacity();
     });
+
+    // 반응 타이머 재초기화 (인터펫 타이머 정리 포함)
+    import("./pet-reactions.js").then(({ destroyReactions, initReactions }) => {
+        destroyReactions();
+        if (state.settings.enabled) initReactions();
+    });
+}
+
+// ===== 멀티펫 =====
+
+/**
+ * 2번째 펫 프리셋 로드
+ * @param {string} presetId - 사용할 프리셋 ID
+ * @returns {boolean}
+ */
+export function loadSecondPet(presetId) {
+    const preset = state.settings.savedPresets?.find(p => p.id === presetId);
+    if (!preset) return false;
+    
+    if (!state.settings.multiPet) {
+        state.settings.multiPet = structuredClone(DEFAULT_SETTINGS.multiPet);
+    }
+    
+    state.settings.multiPet.secondPetPresetId = presetId;
+    state.settings.multiPet.secondPetData = {
+        personality: structuredClone(preset.personality),
+        appearance: structuredClone(preset.appearance),
+        customSpeeches: structuredClone(preset.customSpeeches),
+        fallbackMessages: structuredClone(preset.fallbackMessages || {}),
+        walk: structuredClone(preset.walk || { enabled: true, walkSprite: null }),
+        speechBubble: structuredClone(preset.speechBubble || state.settings.speechBubble),
+    };
+    // personality.enabled는 메인 펫 설정 따라감
+    state.settings.multiPet.secondPetData.personality.enabled = state.settings.personality.enabled;
+    
+    saveSettings();
+    return true;
+}
+
+/**
+ * 2번째 펫 해제
+ */
+export function unloadSecondPet() {
+    if (!state.settings.multiPet) return;
+    
+    state.settings.multiPet.secondPetPresetId = null;
+    state.settings.multiPet.secondPetData = null;
+    state.settings.multiPet.secondPetCondition = { hunger: 100, lastFed: null };
+    state.settings.multiPet.secondPetPosition = { location: "bottom-left", customX: null, customY: null };
+    saveSettings();
 }

@@ -131,6 +131,7 @@ export const DEFAULT_SETTINGS = {
         longAbsence: [], // 오랜만에 접속
         feeding: [],     // 밥먹을때
         hungry: [],      // 배고플때
+        collision: [],   // 충돌시 (멀티펫)
     },
     
     // 컨디션 시스템
@@ -144,8 +145,12 @@ export const DEFAULT_SETTINGS = {
     conversationLog: {
         directLogs: {},    // 펫별 직접 대화 로그 { petName: [{...}] }
         chatLogs: {},      // 채팅방별 반응 로그 { chatId: [{...}] }
+        interPetLogs: {},  // 펫 간 대화 로그 { "nameA_nameB": [{...}] } (이름 정렬 키)
         maxLogs: 100,      // 최대 보관 개수 (종류별)
     },
+
+    // 대사 출력 언어 (AI 프롬프트 언어)
+    speechLanguage: "ko",
 
     // 실패 시 표시할 대사 (유저 커스텀 가능)
     fallbackMessages: {
@@ -173,6 +178,21 @@ export const DEFAULT_SETTINGS = {
         historyCount: 6, // 읽을 이전 메시지 수 (1~20)
         reactionMode: "observer", // "observer" (관전자) | "character" (속마음)
         includeWorldInfo: false, // 월드인포(로어북) 포함 여부
+    },
+
+    // 멀티펫
+    multiPet: {
+        enabled: false,                     // 멀티펫 ON/OFF
+        secondPetPresetId: null,            // 2번째 펫으로 사용할 프리셋 ID
+        chatReactor: "primary",             // 채팅 반응할 펫: "primary" | "secondary" | "alternate"
+        interPetChat: {
+            enabled: false,                 // 펫끼리 자동 대화
+            interval: 5,                    // 대화 간격 (분)
+        },
+        dualDirectTalk: false,              // 직접대화 시 양쪽 반응
+        secondPetData: null,                // 2번째 펫 데이터 (프리셋에서 로드)
+        secondPetCondition: { hunger: 100, lastFed: null },
+        secondPetPosition: { location: "bottom-left", customX: null, customY: null },
     },
 };
 
@@ -367,3 +387,37 @@ export const FONT_LIST = [
     { id: "ThinRounded", name: "얇은둥근모" },
     { id: "Mulmaru", name: "물마루" },
 ];
+
+// 펫 충돌 시 대사
+export const COLLISION_SPEECHES = [
+    "야, 비켜!",
+    "좁으니까 이쪽 오지마!",
+    "...밀지 마.",
+    "자리 뺏지마!!",
+    "흥, 여기 내 자리야.",
+    "왜 여기까지 와!",
+];
+
+// 대사 출력 언어 설정
+export const SPEECH_LANGUAGES = {
+    ko: { label: "한국어", promptName: "Korean", sentenceDesc: "1-2 문장" },
+    en: { label: "English", promptName: "English", sentenceDesc: "1-2 sentences" },
+    ja: { label: "日本語", promptName: "Japanese", sentenceDesc: "1-2文" },
+    zh: { label: "中文", promptName: "Chinese", sentenceDesc: "1-2句" },
+};
+
+// 보조 무드 매핑 (주 반응 펫의 무드 → 비반응 펫의 가능한 무드)
+export const COMPLEMENTARY_MOODS = {
+    happy: ["happy", "excited", "shy"],
+    sad: ["sad", "nervous", "thinking"],
+    excited: ["happy", "excited", "surprised"],
+    surprised: ["surprised", "nervous", "thinking"],
+    nervous: ["nervous", "thinking", "shy"],
+    confident: ["happy", "confident", "thinking"],
+    shy: ["shy", "happy", "nervous"],
+    angry: ["surprised", "nervous", "angry"],
+    thinking: ["thinking", "nervous", "idle"],
+    idle: ["idle", "thinking", "happy"],
+    sleeping: ["sleeping", "idle"],
+    dragging: ["surprised", "angry"],
+};

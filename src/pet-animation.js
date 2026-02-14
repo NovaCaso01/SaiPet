@@ -13,9 +13,17 @@ export const PET_STATES = MOOD_STATES;
  * 현재 스프라이트 가져오기
  * @returns {string}
  */
-export function getCurrentSprite() {
-    const { customSprites } = state.settings.appearance;
-    const currentState = state.currentState || PET_STATES.IDLE;
+export function getCurrentSprite(petId = "primary") {
+    let customSprites, currentState;
+    
+    if (petId === "secondary") {
+        const spd = state.settings.multiPet?.secondPetData;
+        customSprites = spd?.appearance?.customSprites || {};
+        currentState = state.secondPet.currentState || PET_STATES.IDLE;
+    } else {
+        customSprites = state.settings.appearance.customSprites;
+        currentState = state.currentState || PET_STATES.IDLE;
+    }
     
     // 커스텀 이미지가 하나라도 설정되어 있는지 확인
     const hasAnyCustom = Object.values(customSprites).some(v => v);
@@ -39,23 +47,36 @@ export function getCurrentSprite() {
  * @param {string} newState - 새 상태
  * @param {number|null} duration - 지속 시간 (ms), null이면 영구
  */
-export function setState(newState, duration = null) {
-    const prevState = state.currentState;
-    state.currentState = newState;
+export function setState(newState, duration = null, petId = "primary") {
+    let prevState;
     
-    log(`State: ${prevState} -> ${newState}`);
+    if (petId === "secondary") {
+        prevState = state.secondPet.currentState;
+        state.secondPet.currentState = newState;
+    } else {
+        prevState = state.currentState;
+        state.currentState = newState;
+    }
+    
+    log(`State [${petId}]: ${prevState} -> ${newState}`);
     
     // 스프라이트 업데이트
-    updatePetSprite();
+    if (petId === "secondary") {
+        import("./pet-core.js").then(({ updateSecondPetSprite }) => updateSecondPetSprite());
+    } else {
+        updatePetSprite();
+    }
     
     // 애니메이션 클래스 적용
-    applyStateAnimation(newState);
+    const containerId = petId === "secondary" ? "saipet-container-2" : "saipet-container";
+    applyStateAnimation(newState, containerId);
     
     // 지속 시간 후 idle로 복귀
     if (duration !== null) {
         setTimeout(() => {
-            if (state.currentState === newState) {
-                setState(PET_STATES.IDLE);
+            const curState = petId === "secondary" ? state.secondPet.currentState : state.currentState;
+            if (curState === newState) {
+                setState(PET_STATES.IDLE, null, petId);
             }
         }, duration);
     }
@@ -65,8 +86,8 @@ export function setState(newState, duration = null) {
  * 상태별 애니메이션 클래스 적용
  * @param {string} petState 
  */
-function applyStateAnimation(petState) {
-    const container = document.getElementById("saipet-container");
+function applyStateAnimation(petState, containerId = "saipet-container") {
+    const container = document.getElementById(containerId);
     if (!container) return;
     
     // 기존 상태 클래스 제거
@@ -81,8 +102,9 @@ function applyStateAnimation(petState) {
 /**
  * 간단한 바운스 애니메이션
  */
-export function playBounce() {
-    const container = document.getElementById("saipet-container");
+export function playBounce(petId = "primary") {
+    const containerId = petId === "secondary" ? "saipet-container-2" : "saipet-container";
+    const container = document.getElementById(containerId);
     if (!container) return;
     
     container.classList.add("bounce");
@@ -94,8 +116,9 @@ export function playBounce() {
 /**
  * 간단한 흔들림 애니메이션
  */
-export function playShake() {
-    const container = document.getElementById("saipet-container");
+export function playShake(petId = "primary") {
+    const containerId = petId === "secondary" ? "saipet-container-2" : "saipet-container";
+    const container = document.getElementById(containerId);
     if (!container) return;
     
     container.classList.add("shake");
@@ -107,11 +130,10 @@ export function playShake() {
 /**
  * 하트 파티클 애니메이션 (쓰다듬기 시)
  */
-export function playHearts() {
-    const container = document.getElementById("saipet-container");
-    if (!container) return;
-    
-    const wrapper = container.querySelector(".st-pet-wrapper");
+export function playHearts(petId = "primary") {
+    const containerId = petId === "secondary" ? "saipet-container-2" : "saipet-container";
+    const container = document.getElementById(containerId);
+    const wrapper = container?.querySelector(".st-pet-wrapper");
     if (!wrapper) return;
     
     const hearts = ["🩷", "🖤"];
@@ -137,8 +159,9 @@ export function playHearts() {
 /**
  * 졸기 zzZ 이펙트 표시
  */
-export function showSleepZzz() {
-    const container = document.getElementById("saipet-container");
+export function showSleepZzz(petId = "primary") {
+    const containerId = petId === "secondary" ? "saipet-container-2" : "saipet-container";
+    const container = document.getElementById(containerId);
     if (!container) return;
     
     // 이미 있으면 스킵
@@ -156,8 +179,9 @@ export function showSleepZzz() {
 /**
  * 졸기 zzZ 이펙트 제거
  */
-export function hideSleepZzz() {
-    const container = document.getElementById("saipet-container");
+export function hideSleepZzz(petId = "primary") {
+    const containerId = petId === "secondary" ? "saipet-container-2" : "saipet-container";
+    const container = document.getElementById(containerId);
     if (!container) return;
     
     const zzz = container.querySelector(".st-pet-zzz");

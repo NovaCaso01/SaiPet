@@ -9,6 +9,7 @@ import { saveSettings } from "./storage.js";
 import { setState, PET_STATES, playBounce, playShake, playHearts, showSleepZzz, hideSleepZzz } from "./pet-animation.js";
 import { showStateSpeech, showSpeechBubble } from "./pet-speech.js";
 import { showAIReaction } from "./pet-ai.js";
+import { COMPLEMENTARY_MOODS } from "./constants.js";
 
 /**
  * 이벤트 리스너 등록
@@ -47,6 +48,9 @@ export function initReactions() {
     // 컨디션 시스템 시작 (배고픔 감소 등)
     startConditionTimer();
     
+    // 멀티펫 자동 대화 타이머 시작
+    startInterPetChatTimer();
+    
     log("Reactions initialized");
 }
 
@@ -62,6 +66,7 @@ export function destroyReactions() {
     
     stopIdleTimer();
     stopConditionTimer();
+    stopInterPetChatTimer();
     
     log("Reactions destroyed");
 }
@@ -75,6 +80,9 @@ function onUserMessage() {
     
     resetIdleTimer();
     triggerReaction("userMessage");
+    if (state.settings.multiPet?.enabled && state.settings.multiPet?.secondPetData) {
+        triggerReaction("userMessage", "secondary");
+    }
 }
 
 /**
@@ -106,14 +114,13 @@ let messageCounter = 0;
 
 function onAIResponse(messageId) {
     if (!state.isReady) return;
-    if (state.isPetGenerating) return;
     if (greetingCooldown) return; // 인사 직후 다른 확장의 AI 반응 무시
     
     log("onAIResponse triggered, messageId:", messageId);
     
     resetIdleTimer();
     
-    // 반응 간격 체크 (N번째 메시지마다 반응)
+    // 반응 간격 체크 (N번째 메시지마다 반응) — 스킵되더라도 항상 증가
     messageCounter++;
     const interval = state.settings.reactions.reactionInterval || 3;
     if (messageCounter < interval) {
@@ -122,7 +129,57 @@ function onAIResponse(messageId) {
     }
     messageCounter = 0;
     
-    triggerReaction("aiResponse");
+    // 채팅 반응할 펫 결정 (chatReactor 설정)
+    let reactPetId = "primary";
+    if (state.settings.multiPet?.enabled && state.settings.multiPet?.secondPetData) {
+        const reactor = state.settings.multiPet.chatReactor || "primary";
+        if (reactor === "secondary") {
+            reactPetId = "secondary";
+        } else if (reactor === "alternate") {
+            reactionAlternator = !reactionAlternator;
+            reactPetId = reactionAlternator ? "secondary" : "primary";
+        }
+    }
+    
+    // 펫 API 호출 중이면 대기 후 실행 (최대 15초)
+    if (state.isPetGenerating || state.secondPet?.isPetGenerating) {
+        log("Pet is generating, deferring AI reaction...");
+        waitForPetIdle(15000, 2000).then(available => {
+            if (available) {
+                log("Pet now idle, executing deferred AI reaction");
+                triggerReaction("aiResponse", reactPetId);
+            } else {
+                log("Deferred AI reaction timed out, discarding");
+            }
+        });
+        return;
+    }
+    
+    triggerReaction("aiResponse", reactPetId);
+}
+
+/**
+ * 펫 API 호출이 끝날 때까지 대기 (폴링)
+ * @param {number} maxWait - 최대 대기 시간 (ms)
+ * @param {number} pollInterval - 폴링 간격 (ms)
+ * @returns {Promise<boolean>} - true면 idle 상태, false면 타임아웃
+ */
+function waitForPetIdle(maxWait = 15000, pollInterval = 2000) {
+    return new Promise(resolve => {
+        const start = Date.now();
+        const check = () => {
+            if (!state.isPetGenerating && !state.secondPet?.isPetGenerating) {
+                resolve(true);
+                return;
+            }
+            if (Date.now() - start >= maxWait) {
+                resolve(false);
+                return;
+            }
+            setTimeout(check, pollInterval);
+        };
+        check();
+    });
 }
 
 /**
@@ -138,6 +195,10 @@ function onGenerationEnd() {
         setState(PET_STATES.IDLE);
         log("Generation ended, reset to idle");
     }
+    if (state.settings.multiPet?.enabled && state.secondPet?.currentState === PET_STATES.THINKING) {
+        setState(PET_STATES.IDLE, null, "secondary");
+        log("Generation ended, reset secondary to idle");
+    }
 }
 
 /**
@@ -147,7 +208,8 @@ function onChatChanged() {
     if (!state.isReady) return;
     log("Chat changed");
     
-    // 채팅방 이동 시에는 인사 없이 idle 타이머만 리셋
+    // 채팅방 이동 시 카운터 리셋 + idle 타이머 리셋
+    messageCounter = 0;
     resetIdleTimer();
 }
 
@@ -171,6 +233,9 @@ function triggerEntryGreeting() {
         state.settings.condition.lastVisit = now;
         saveSettings();
         triggerReaction("longAbsence");
+        if (state.settings.multiPet?.enabled && state.settings.multiPet?.secondPetData) {
+            triggerReaction("longAbsence", "secondary");
+        }
         return;
     }
     
@@ -185,15 +250,21 @@ function triggerEntryGreeting() {
     const context = getContext();
     const hasCharacter = context?.characterId !== undefined && context?.characterId !== null;
     
+    // 멀티펫 활성 여부
+    const hasSecondPet = state.settings.multiPet?.enabled && state.settings.multiPet?.secondPetData;
+    
     // 3. 시간대별 인사 (ST 처음 접속 시 1회만)
     if (!state.hasShownTimeGreeting) {
         state.hasShownTimeGreeting = true;
         if (hour >= 0 && hour <= 6) {
             triggerReaction("latenight");
+            if (hasSecondPet) triggerReaction("latenight", "secondary");
         } else if (hour >= 7 && hour <= 10) {
             triggerReaction("morning");
+            if (hasSecondPet) triggerReaction("morning", "secondary");
         } else {
             triggerReaction("greeting");
+            if (hasSecondPet) triggerReaction("greeting", "secondary");
         }
         return;
     }
@@ -201,6 +272,7 @@ function triggerEntryGreeting() {
     // 4. 이미 시간 인사 했고, AI 채팅방이면 일반 인사
     if (hasCharacter) {
         triggerReaction("greeting");
+        if (hasSecondPet) triggerReaction("greeting", "secondary");
     }
 }
 
@@ -208,132 +280,128 @@ function triggerEntryGreeting() {
  * 반응 트리거
  * @param {string} triggerType - 트리거 종류
  */
-export async function triggerReaction(triggerType) {
-    log(`Trigger: ${triggerType}`);
+export async function triggerReaction(triggerType, petId = "primary") {
+    log(`Trigger [${petId}]: ${triggerType}`);
     
     // sleeping 이외의 트리거면 zzz 이펙트 제거
     if (triggerType !== "sleeping" && triggerType !== "idle") {
-        hideSleepZzz();
+        hideSleepZzz(petId);
     }
     
     // === 배고픔 패널티 체크 ===
-    const hunger = state.settings.condition?.hunger ?? 100;
+    const hunger = petId === "secondary"
+        ? (state.settings.multiPet?.secondPetCondition?.hunger ?? 100)
+        : (state.settings.condition?.hunger ?? 100);
     const isStarving = hunger <= 10;
     const isHungry = hunger <= 30;
     
     // 배고프면 상호작용 무시 (50% 확률, 밥주기/배고픔 트리거는 예외)
     if (isStarving && !["feeding", "hungry", "dragging"].includes(triggerType)) {
         if (["click", "petting", "clickSpam"].includes(triggerType) && Math.random() < 0.5) {
-            showStateSpeech("hungry");
-            setState(PET_STATES.SAD, 2000);
-            log(`Hunger penalty: ignored ${triggerType} (starving)`);
+            showStateSpeech("hungry", petId);
+            setState(PET_STATES.SAD, 2000, petId);
+            log(`Hunger penalty [${petId}]: ignored ${triggerType} (starving)`);
             return;
         }
     }
     
     // 기본 상태 및 컨텍스트 결정
     let defaultMood = PET_STATES.IDLE;
-    let speechType = "idle"; // idle, sleeping, interaction 중 하나 (커스텀 대사용)
+    let speechType = "idle";
     
     switch (triggerType) {
         case "userMessage":
-            // 유저 메시지 전송 시: 바운스 (thinking은 GENERATION_STARTED에서 지연 처리)
-            playBounce();
+            playBounce(petId);
             return;
             
         case "aiResponse":
-            // AI 응답 시: 채팅 읽고 성격 기반 반응 생성 (CM API 1회 호출)
             defaultMood = PET_STATES.HAPPY;
-            playBounce();
+            playBounce(petId);
             
             if (state.settings.personality.enabled) {
-                await showAIReaction();
+                const reactionResult = await showAIReaction(petId);
+                
+                // 비반응 펫은 보조 무드만 변경 (API 호출 없음)
+                if (state.settings.multiPet?.enabled && state.settings.multiPet?.secondPetData && reactionResult) {
+                    const otherPetId = petId === "primary" ? "secondary" : "primary";
+                    const compMoods = COMPLEMENTARY_MOODS[reactionResult.mood] || ["idle"];
+                    const compMood = compMoods[Math.floor(Math.random() * compMoods.length)];
+                    setState(compMood, 4000, otherPetId);
+                }
             }
             
-            // thinking에 걸리지 않도록 보장
-            if (state.currentState === PET_STATES.THINKING) {
-                setState(defaultMood, 2000);
+            const curState = petId === "secondary" ? state.secondPet.currentState : state.currentState;
+            if (curState === PET_STATES.THINKING) {
+                setState(defaultMood, 2000, petId);
             }
             return;
             
         case "idle":
-            // 대기 시간 초과 (4분): 대기중 대사
             defaultMood = PET_STATES.IDLE;
             speechType = "idle";
             break;
 
         case "sleeping":
-            // 장기 대기 (10분): 잠자기 대사 + zzZ
             defaultMood = PET_STATES.SLEEPING;
             speechType = "sleeping";
-            showSleepZzz();
+            showSleepZzz(petId);
             break;
             
         case "dragging":
-            // 드래그 시: 드래그 대사 (드래그 끝날 때까지 유지)
             defaultMood = PET_STATES.DRAGGING;
             speechType = "dragging";
-            setState(defaultMood, null); // 영구 - onDragEnd에서 idle로 복귀
-            showStateSpeech(speechType);
+            setState(defaultMood, null, petId);
+            showStateSpeech(speechType, petId);
             return;
         
         case "click":
-            // 클릭 시: 클릭 대사
             defaultMood = PET_STATES.HAPPY;
             speechType = "click";
-            playBounce();
+            playBounce(petId);
             break;
         
         case "clickSpam":
-            // 연속 클릭 (5회+): 짜증 반응
             defaultMood = PET_STATES.ANGRY;
             speechType = "clickSpam";
-            playShake();
+            playShake(petId);
             break;
         
         case "petting":
-            // 쓰다듬기 (길게 클릭/홀드)
             defaultMood = PET_STATES.SHY;
             speechType = "petting";
-            playBounce();
-            playHearts();
+            playBounce(petId);
+            playHearts(petId);
             break;
         
         case "greeting":
-            // 인사
             defaultMood = PET_STATES.HAPPY;
             speechType = "greeting";
-            playBounce();
+            playBounce(petId);
             break;
         
         case "latenight":
-            // 심야 인사
             defaultMood = PET_STATES.IDLE;
             speechType = "latenight";
             break;
         
         case "morning":
-            // 아침 인사
             defaultMood = PET_STATES.SLEEPING;
             speechType = "morning";
             break;
         
         case "longAbsence":
-            // 오랜만에 접속
             defaultMood = PET_STATES.SURPRISED;
             speechType = "longAbsence";
-            playShake();
+            playShake(petId);
             break;
         
         case "feeding":
-            // 밥주기
             defaultMood = PET_STATES.HAPPY;
             speechType = "feeding";
-            playBounce();
+            playBounce(petId);
             break;
         
         case "hungry":
-            // 배고픔 알림
             defaultMood = PET_STATES.SAD;
             speechType = "hungry";
             break;
@@ -343,14 +411,12 @@ export async function triggerReaction(triggerType) {
             speechType = "idle";
     }
     
-    // 커스텀 대사 표시 (idle, sleeping, interaction만)
-    // 배고픔 패널티: idle 상태에서 배고프면 대사 변경 (sleeping은 유지)
     if (isHungry && speechType === "idle") {
         speechType = "hungry";
         defaultMood = PET_STATES.SAD;
     }
-    setState(defaultMood, triggerType === "idle" || triggerType === "sleeping" ? null : 2000);
-    showStateSpeech(speechType);
+    setState(defaultMood, triggerType === "idle" || triggerType === "sleeping" ? null : 2000, petId);
+    showStateSpeech(speechType, petId);
 }
 
 /**
@@ -365,12 +431,18 @@ function startIdleTimer() {
     state.idleTimer = setTimeout(() => {
         if (!state.isGenerating && !state.isPetGenerating) {
             triggerReaction("idle");
+            if (state.settings.multiPet?.enabled && state.settings.multiPet?.secondPetData && !state.secondPet.isPetGenerating) {
+                triggerReaction("idle", "secondary");
+            }
         }
     }, idleTimeout);
     
     state.sleepTimer = setTimeout(() => {
         if (!state.isGenerating && !state.isPetGenerating) {
             triggerReaction("sleeping");
+            if (state.settings.multiPet?.enabled && state.settings.multiPet?.secondPetData && !state.secondPet.isPetGenerating) {
+                triggerReaction("sleeping", "secondary");
+            }
         }
     }, sleepTimeout);
 }
@@ -405,6 +477,9 @@ const CONDITION_INTERVAL = 5 * 60 * 1000; // 5분마다 체크
 const HUNGER_DECAY_PER_CHECK = 3;          // 5분마다 배고픔 -3 (약 2.7시간에 0)
 const HUNGER_WARNING = 30;                  // 이 이하면 배고픔 알림
 let hungryNotified = false;                 // 배고픔 알림 중복 방지
+let secondPetHungryNotified = false;        // 2번째 펫 배고픔 알림 중복 방지
+let interPetChatTimer = null;               // 펫끼리 자동 대화 타이머
+let reactionAlternator = false;             // alternate 모드 교대 플래그
 
 /**
  * 컨디션 타이머 시작
@@ -457,6 +532,20 @@ function updateCondition() {
     saveSettings();
     
     log(`Condition update: hunger=${state.settings.condition.hunger}`);
+    
+    // 2번째 펫 컨디션
+    if (state.settings.multiPet?.enabled && state.settings.multiPet?.secondPetCondition) {
+        state.settings.multiPet.secondPetCondition.hunger = Math.max(0, state.settings.multiPet.secondPetCondition.hunger - HUNGER_DECAY_PER_CHECK);
+        updateSecondPetHungerGauge();
+        
+        if (state.settings.multiPet.secondPetCondition.hunger <= HUNGER_WARNING && !secondPetHungryNotified && !state.secondPet.isPetGenerating) {
+            secondPetHungryNotified = true;
+            triggerReaction("hungry", "secondary");
+        }
+        if (state.settings.multiPet.secondPetCondition.hunger > HUNGER_WARNING) {
+            secondPetHungryNotified = false;
+        }
+    }
     
     // 배고픔 알림 (30 이하, 생성중 아닐 때)
     if (state.settings.condition.hunger <= HUNGER_WARNING && !hungryNotified && !state.isGenerating && !state.isPetGenerating) {
@@ -513,4 +602,105 @@ export function feedPet() {
     triggerReaction("feeding");
 }
 
+/**
+ * 2번째 펫 밥주기
+ */
+export function feedSecondPet() {
+    if (!state.settings.multiPet?.enabled) return;
+    if (!state.settings.multiPet.secondPetCondition) {
+        state.settings.multiPet.secondPetCondition = { hunger: 100, lastFed: null };
+    }
+    
+    const before = state.settings.multiPet.secondPetCondition.hunger;
+    state.settings.multiPet.secondPetCondition.hunger = Math.min(100, state.settings.multiPet.secondPetCondition.hunger + 40);
+    state.settings.multiPet.secondPetCondition.lastFed = Date.now();
+    secondPetHungryNotified = false;
+    saveSettings();
+    
+    log(`Fed second pet: ${before} -> ${state.settings.multiPet.secondPetCondition.hunger}`);
+    
+    updateSecondPetHungerGauge();
+    triggerReaction("feeding", "secondary");
+}
 
+/**
+ * 2번째 펫 배고픔 게이지 UI 업데이트
+ */
+function updateSecondPetHungerGauge() {
+    const gauge = document.querySelector("#saipet-container-2 .st-pet-hunger-fill");
+    if (gauge) {
+        const hunger = state.settings.multiPet?.secondPetCondition?.hunger ?? 100;
+        gauge.style.width = `${hunger}%`;
+        
+        if (hunger <= 20) {
+            gauge.style.backgroundColor = "rgba(190, 100, 100, 0.65)";
+        } else if (hunger <= 50) {
+            gauge.style.backgroundColor = "rgba(190, 170, 100, 0.65)";
+        } else {
+            gauge.style.backgroundColor = "rgba(100, 180, 140, 0.65)";
+        }
+    }
+}
+
+// ===== 펫끼리 자동 대화 시스템 =====
+
+/**
+ * 펫끼리 자동 대화 타이머 시작
+ */
+function startInterPetChatTimer() {
+    stopInterPetChatTimer();
+    
+    if (!state.settings.multiPet?.enabled) return;
+    if (!state.settings.multiPet?.interPetChat?.enabled) return;
+    if (!state.settings.multiPet?.secondPetData) return;
+    
+    const intervalMin = state.settings.multiPet.interPetChat.interval || 5;
+    const intervalMs = intervalMin * 60 * 1000;
+    
+    interPetChatTimer = setInterval(async () => {
+        // 생성 중이면 30초 후 1회 재시도
+        if (state.isPetGenerating || state.secondPet?.isPetGenerating) {
+            log("Inter-pet chat blocked, will retry in 30s");
+            setTimeout(async () => {
+                if (state.isPetGenerating || state.secondPet?.isPetGenerating) {
+                    log("Inter-pet chat retry still blocked, skipping");
+                    return;
+                }
+                try {
+                    const { showInterPetDialogue } = await import("./pet-ai.js");
+                    await showInterPetDialogue();
+                } catch (err) {
+                    logError("Inter-pet chat retry error:", err);
+                }
+            }, 30000);
+            return;
+        }
+        
+        try {
+            const { showInterPetDialogue } = await import("./pet-ai.js");
+            await showInterPetDialogue();
+        } catch (err) {
+            logError("Inter-pet chat error:", err);
+        }
+    }, intervalMs);
+    
+    log(`Inter-pet chat timer started: interval=${intervalMin}min`);
+}
+
+/**
+ * 펫끼리 자동 대화 타이머 중지
+ */
+function stopInterPetChatTimer() {
+    if (interPetChatTimer) {
+        clearInterval(interPetChatTimer);
+        interPetChatTimer = null;
+        log("Inter-pet chat timer stopped");
+    }
+}
+
+/**
+ * 펫끼리 자동 대화 타이머 재시작 (설정 변경 시 호출)
+ */
+export function restartInterPetChatTimer() {
+    startInterPetChatTimer();
+}
