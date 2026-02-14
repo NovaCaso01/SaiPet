@@ -1005,8 +1005,8 @@ async function callConnectionManagerAPI(prompt) {
         throw new Error(`Profile ${profileId} not found`);
     }
     
-    // thinking 모드 감안, 넉넉하게 2000 토큰 보장
-    const maxTokens = Math.max(state.settings.api.maxTokens || 2000, 2000);
+    // thinking 모드 감안, 넉넉하게 3000 토큰 보장
+    const maxTokens = Math.max(state.settings.api.maxTokens || 3000, 3000);
     
     const messages = [
         { role: "user", content: prompt }
@@ -1043,7 +1043,7 @@ async function callDefaultAPI(prompt) {
     const result = await generateRaw({
         prompt: prompt,
         quietToLoud: false,
-        responseLength: state.settings.api.maxTokens || 2000,
+        responseLength: state.settings.api.maxTokens || 3000,
     });
     return result || "";
 }
@@ -1342,6 +1342,8 @@ export async function showInterPetDialogue() {
     if (firstResult.text) {
         setState(firstResult.mood, 12000, firstPetId);
         showSpeechBubble(firstResult.text, 12000, true, firstPetId);
+        // 두 번째 스피커는 대기 중이므로 THINKING → IDLE로 전환 (자기 턴까지 대기)
+        setState(PET_STATES.IDLE, null, secondPetId);
     }
     
     if (secondResult.text) {

@@ -174,7 +174,7 @@ export const DEFAULT_SETTINGS = {
     api: {
         useConnectionManager: false,
         connectionProfile: null,
-        maxTokens: 2000,
+        maxTokens: 3000,
         historyCount: 6, // 읽을 이전 메시지 수 (1~20)
         reactionMode: "observer", // "observer" (관전자) | "character" (속마음)
         includeWorldInfo: false, // 월드인포(로어북) 포함 여부
