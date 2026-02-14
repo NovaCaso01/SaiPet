@@ -1282,7 +1282,9 @@ export function checkAndResolvePetCollision(movingPetId = "primary") {
     saveSettings();
     
     import("./pet-animation.js").then(({ playBounce }) => playBounce(pushedId));
-    const customCollision = state.settings.customSpeeches?.collision;
+    const customCollision = pushedId === "secondary"
+        ? (state.settings.multiPet?.secondPetData?.customSpeeches?.collision)
+        : (state.settings.customSpeeches?.collision);
     const collisionPool = (customCollision && customCollision.length > 0) ? customCollision : COLLISION_SPEECHES;
     const speech = collisionPool[Math.floor(Math.random() * collisionPool.length)];
     import("./pet-speech.js").then(({ showSpeechBubble }) => showSpeechBubble(speech, 3000, false, pushedId));

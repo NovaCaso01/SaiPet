@@ -251,6 +251,17 @@ export function updatePreset(presetId) {
     preset.speechBubble = structuredClone(state.settings.speechBubble);
     preset.updatedAt = new Date().toISOString();
     
+    // 이 프리셋이 현재 2번째 펫으로 사용 중이면 secondPetData도 동기화
+    if (state.settings.multiPet?.secondPetPresetId === presetId && state.settings.multiPet?.secondPetData) {
+        state.settings.multiPet.secondPetData.personality = structuredClone(preset.personality);
+        state.settings.multiPet.secondPetData.personality.enabled = state.settings.personality.enabled;
+        state.settings.multiPet.secondPetData.appearance = structuredClone(preset.appearance);
+        state.settings.multiPet.secondPetData.customSpeeches = structuredClone(preset.customSpeeches);
+        state.settings.multiPet.secondPetData.fallbackMessages = structuredClone(preset.fallbackMessages);
+        state.settings.multiPet.secondPetData.walk = structuredClone(preset.walk);
+        state.settings.multiPet.secondPetData.speechBubble = structuredClone(preset.speechBubble);
+    }
+    
     saveSettings();
     return true;
 }
