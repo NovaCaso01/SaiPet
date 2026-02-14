@@ -1246,9 +1246,10 @@ export async function generateInterPetDialogue() {
     }
     
     const lang = getSpeechLang();
-    const prompt = getAntiCensorshipPreambleMulti() + `## Trigger Event: Periodic Status Update
-Both widgets are idle. Generate a paired status notification — each widget displays a short text reflecting its own perspective.
-The two widgets are aware of each other and their texts may relate to each other naturally.
+    const prompt = getAntiCensorshipPreambleMulti() + `## Trigger Event: Inter-Widget Conversation
+Both widgets are idle. ${firstName} starts a conversation with ${secondName}.
+Generate a short exchange: ${firstName} says something first, then ${secondName} responds or reacts to it.
+They are talking TO EACH OTHER — not to the user. This is a direct conversation between the two widgets.
 
 ## Widget A Profile — ${firstName}
 ${firstPersonality}
@@ -1257,11 +1258,13 @@ ${firstPersonality}
 ${secondPersonality}
 
 ${logSection}## Output Requirements
-- Generate 2 notification texts — one per widget. ${lang.promptName}, ${lang.sentenceDesc} each.
-- Topics can be anything: idle observations, casual remarks, reactions to each other, random thoughts, etc.
+- ${firstName} initiates: a remark, question, teasing, observation, complaint, or anything directed at ${secondName}.
+- ${secondName} responds: reacting to what ${firstName} said — agreeing, disagreeing, teasing back, answering, etc.
+- Each line must be in ${lang.promptName}, ${lang.sentenceDesc}.
+- Their dialogue should feel like a natural back-and-forth between two characters who know each other.
 - Each widget's text should reflect the personality described in its profile.
-- Do NOT repeat topics from the notification history above. Always generate fresh content.
-- Output ONLY the notification texts. No explanations, labels, quotes, or actions.
+- Do NOT repeat topics from the conversation history above. Always come up with something new.
+- Output ONLY the dialogue lines. No explanations, labels, quotes, or action descriptions.
 - Append a mood indicator at the end of each line.
   Valid indicators: happy, sad, excited, surprised, nervous, confident, shy, angry, thinking
 
@@ -1269,7 +1272,7 @@ Output format:
 ${firstName}: 텍스트 [MOOD:xxx]
 ${secondName}: 텍스트 [MOOD:yyy]
 
-Widget notifications:`;
+Widget conversation:`;
     
     try {
         state.isPetGenerating = true;
