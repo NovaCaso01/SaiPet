@@ -76,10 +76,14 @@ function handleDeviceChange() {
  * 모바일 감지 리스너 등록
  */
 function setupMobileDetection() {
+    let resizeDebounce = null;
     const onResize = () => {
-        handleDeviceChange();
-        clampPetPosition();
-        clampPetPosition("secondary");
+        if (resizeDebounce) clearTimeout(resizeDebounce);
+        resizeDebounce = setTimeout(() => {
+            handleDeviceChange();
+            clampPetPosition();
+            clampPetPosition("secondary");
+        }, 200);
     };
     window.addEventListener("resize", onResize);
     
@@ -98,6 +102,16 @@ jQuery(async () => {
 
     // 설정 병합 (새 설정 항목 추가 대응)
     mergeSettings(extension_settings[EXTENSION_NAME], DEFAULT_SETTINGS);
+
+    // personalMemo(구) → personalMemos(신) 마이그레이션
+    const p = extension_settings[EXTENSION_NAME].personality;
+    if (p?.personalMemo && typeof p.personalMemo === "string" && p.personalMemo.trim()) {
+        if (!p.personalMemos || !Array.isArray(p.personalMemos)) p.personalMemos = [];
+        p.personalMemos.push({ tag: "기타", content: p.personalMemo.trim() });
+        delete p.personalMemo;
+    } else if (p) {
+        delete p.personalMemo;
+    }
 
     state.settings = extension_settings[EXTENSION_NAME];
 

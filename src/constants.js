@@ -14,7 +14,7 @@ try {
         _extensionBasePath = new URL(match[1]).pathname;
     }
 } catch (e) {
-    // fallback
+    // 폴백 (감지 실패 시 기본 경로 사용)
 }
 export const EXTENSION_BASE_PATH = _extensionBasePath || `/scripts/extensions/third-party/${EXTENSION_NAME}/`;
 
@@ -103,6 +103,7 @@ export const DEFAULT_SETTINGS = {
         name: "미유",
         ownerName: "",      // 펫에게 알려줄 주인 이름 (비우면 ST 페르소나 사용)
         ownerPersona: "",   // 펫에게 알려줄 주인 설정 (비우면 ST 페르소나 사용)
+        personalMemos: [],   // 태그 기반 개인 메모 [{tag: string, content: string}]
         userRelation: "",   // 유저와 펫의 관계 (비우면 "owner" 사용)
     },
     
@@ -111,8 +112,8 @@ export const DEFAULT_SETTINGS = {
         onUserMessage: true,
         onAIResponse: true,
         onIdle: true,
-        idleTimeout: 240,
-        sleepTimeout: 600,
+        idleTimeout: 300,
+        sleepTimeout: 900,
         onInteraction: true,
         reactionInterval: 3, // N번째 메시지마다 반응 (1 = 매번)
     },
@@ -147,6 +148,31 @@ export const DEFAULT_SETTINGS = {
         chatLogs: {},      // 채팅방별 반응 로그 { chatId: [{...}] }
         interPetLogs: {},  // 펫 간 대화 로그 { "nameA_nameB": [{...}] } (이름 정렬 키)
         maxLogs: 100,      // 최대 보관 개수 (종류별)
+    },
+
+    // 펫 일기장 (꿈 + 일기)
+    petJournal: {
+        dreamEnabled: false,    // 꿈 시스템 ON/OFF
+        diaryEnabled: false,    // 일기 시스템 ON/OFF
+        diaryWriter: "primary", // 일기 작성 펫: "primary" | "secondary" | "both"
+        dreams: {},             // { petName: [{ timestamp, content }] }
+        diaries: {},            // { petName: [{ timestamp, content, logRange: { from, to } }] }
+        maxEntries: 50,         // 종류별 최대 보관 수
+        maxDreamsPerDay: 3,     // 하루 최대 꿈 횟수 (0 = 무제한)
+        lastDiaryDate: null,    // 마지막 일기 작성 날짜 (YYYY-MM-DD)
+        dreamCountToday: 0,     // 오늘 꿈 횟수 카운터
+        dreamCountDate: null,   // 꿈 카운터 기준 날짜 (YYYY-MM-DD)
+    },
+
+    // 알림/리마인드
+    reminders: [],   // [{ id, time (HH:mm), message, days ([0-6], 0=일 6=토, []=1회만), enabled, lastTriggered }]
+    reminderPetId: "primary",   // 알림 담당 펫 ("primary" | "secondary")
+
+    // 자동 일기
+    autoDiary: {
+        enabled: false,         // 자동 일기 ON/OFF
+        minChats: 5,            // 최소 대화 횟수 (direct + interPet)
+        minSessionMinutes: 30,  // 최소 세션 시간 (분)
     },
 
     // 대사 출력 언어 (AI 프롬프트 언어)
@@ -187,9 +213,10 @@ export const DEFAULT_SETTINGS = {
         chatReactor: "primary",             // 채팅 반응할 펫: "primary" | "secondary" | "alternate"
         interPetChat: {
             enabled: false,                 // 펫끼리 자동 대화
-            interval: 5,                    // 대화 간격 (분)
+            interval: 10,                   // 대화 간격 (분)
         },
         dualDirectTalk: false,              // 직접대화 시 양쪽 반응
+        petRelation: "",                    // 펫 A↔B 관계 설명 (예: "자매", "라이벌")
         secondPetData: null,                // 2번째 펫 데이터 (프리셋에서 로드)
         secondPetCondition: { hunger: 100, lastFed: null },
         secondPetPosition: { location: "bottom-left", customX: null, customY: null },
@@ -400,11 +427,16 @@ export const COLLISION_SPEECHES = [
 
 // 대사 출력 언어 설정
 export const SPEECH_LANGUAGES = {
-    ko: { label: "한국어", promptName: "Korean", sentenceDesc: "1-2 문장" },
-    en: { label: "English", promptName: "English", sentenceDesc: "1-2 sentences" },
-    ja: { label: "日本語", promptName: "Japanese", sentenceDesc: "1-2文" },
-    zh: { label: "中文", promptName: "Chinese", sentenceDesc: "1-2句" },
+    ko: { label: "한국어", promptName: "Korean", sentenceDesc: "1-3 문장" },
+    en: { label: "English", promptName: "English", sentenceDesc: "1-3 sentences" },
+    ja: { label: "日本語", promptName: "Japanese", sentenceDesc: "1-3文" },
+    zh: { label: "中文", promptName: "Chinese", sentenceDesc: "1-3句" },
 };
+
+// 개인 메모 프리셋 태그
+export const MEMO_PRESET_TAGS = [
+    "메모", "일정", "건강", "운동", "기타",
+];
 
 // 보조 무드 매핑 (주 반응 펫의 무드 → 비반응 펫의 가능한 무드)
 export const COMPLEMENTARY_MOODS = {
@@ -421,3 +453,5 @@ export const COMPLEMENTARY_MOODS = {
     sleeping: ["sleeping", "idle"],
     dragging: ["surprised", "angry"],
 };
+
+

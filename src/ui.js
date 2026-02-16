@@ -7,12 +7,19 @@ import { state, log } from "./state.js";
 import { saveSettings, fileToBase64, savePreset, loadPreset, deletePreset, updatePreset, getPresetList, resetToDefaultMiyu, exportPreset, importPreset, resetAllSettings } from "./storage.js";
 import { createPetContainer, removePetContainer, updatePetPosition, updatePetSize, updatePetOpacity, updatePetSprite, applyDesignTheme, startWalking, stopWalking, createSecondPetContainer, removeSecondPetContainer, startSecondPetWalking, stopSecondPetWalking } from "./pet-core.js";
 import { extension_settings } from "../../../../extensions.js";
-import { getLogs, clearLogs, deleteLogEntry } from "./pet-ai.js";
+import { getLogs, clearLogs, deleteLogEntry, getJournalEntries, deleteJournalEntry, clearJournal, getJournalPetNames, generateDiary, saveDiary } from "./pet-ai.js";
+import { showSpeechBubble } from "./pet-speech.js";
+import { setState } from "./pet-animation.js";
 import { loadSecondPet, unloadSecondPet } from "./storage.js";
 
 // 대화 로그 페이지네이션 상태
 const LOG_PAGE_SIZE = 10;
 let logCurrentPage = 1;
+
+// 일기장 페이지네이션 상태
+const JOURNAL_PAGE_SIZE = 8;
+let journalCurrentPage = 1;
+let journalTypeFilter = "all";
 
 
 /**
@@ -48,8 +55,8 @@ export async function createUI() {
     // 대사 설정 HTML (비슷한 상황끼리 그룹)
     const speechLabels = {
         // 일상
-        idle: "대기중 (4분 잠수시)",
-        sleeping: "잠잘때 (10분 잠수시)",
+        idle: "대기중 (5분 잠수시)",
+        sleeping: "잠잘때 (15분 잠수시)",
         // 인사/시간
         greeting: "인사",
         morning: "아침 (7~10시)",
@@ -126,7 +133,7 @@ export async function createUI() {
                             <small>
                                 <i class="fa-solid fa-circle-info"></i> <b>내보내기/가져오기 안내</b><br>
                                 <span style="color:var(--SmartThemeBodyColor);">- 포함: 펫 이름 · 성격 · 관계 · 외형(이미지/크기) · 말풍선 · 대사</span><br>
-                                <span style="color:var(--SmartThemeQuoteColor);">- 제외: 유저 이름 · 유저 설정(페르소나) · API · 로그 등</span>
+                                <span style="color:var(--SmartThemeQuoteColor);">- 제외: 유저 이름 · 유저 설정(페르소나) · 개인 메모 · API · 로그 등</span>
                             </small>
                         </div>
                     </div>
@@ -155,6 +162,32 @@ export async function createUI() {
                         <div class="stvp-row">
                             <label>유저 설정</label>
                             <textarea id="stvp-owner-persona" class="text_pole" rows="3" placeholder="펫에게 알려줄 유저 정보 (비우면 ST 페르소나 사용)"></textarea>
+                        </div>
+                        <div class="stvp-memo-section">
+                            <label class="stvp-subsection-title" style="margin-top:6px;"><i class="fa-solid fa-sticky-note"></i> 개인 메모 <small style="color:#888;">(펫이 자연스럽게 참고)</small></label>
+                            <div id="stvp-memo-list" class="stvp-memo-list"></div>
+                            <div class="stvp-memo-add-row">
+                                <select id="stvp-memo-tag-select" class="text_pole" style="width:90px;font-size:12px;">
+                                    <option value="메모">메모</option>
+                                    <option value="일정">일정</option>
+                                    <option value="건강">건강</option>
+                                    <option value="운동">운동</option>
+                                    <option value="기타">기타</option>
+                                </select>
+                                <input type="text" id="stvp-memo-content-input" class="text_pole" style="flex:1;font-size:12px;" placeholder="내용을 입력하세요">
+                                <input type="date" id="stvp-memo-date-input" class="text_pole" style="width:130px;font-size:11px;" title="날짜 (선택사항)">
+                                <button id="stvp-memo-add-btn" class="menu_button" style="padding:2px 8px;font-size:12px;" title="추가"><i class="fa-solid fa-plus"></i></button>
+                            </div>
+                            <div class="stvp-memo-days-row" id="stvp-memo-days-row" style="display:none; margin-top:4px;">
+                                <small style="color:#8a8a9a; font-size:11px; margin-right:4px;">반복:</small>
+                                <button type="button" class="stvp-memo-day-btn" data-day="1">월</button>
+                                <button type="button" class="stvp-memo-day-btn" data-day="2">화</button>
+                                <button type="button" class="stvp-memo-day-btn" data-day="3">수</button>
+                                <button type="button" class="stvp-memo-day-btn" data-day="4">목</button>
+                                <button type="button" class="stvp-memo-day-btn" data-day="5">금</button>
+                                <button type="button" class="stvp-memo-day-btn" data-day="6">토</button>
+                                <button type="button" class="stvp-memo-day-btn" data-day="0">일</button>
+                            </div>
                         </div>
                     </div>
 
@@ -189,7 +222,7 @@ export async function createUI() {
                                     <input type="file" id="stvp-walk-sprite-file" accept="image/*,.gif,.webp" style="display:none;">
                                     <div class="stvp-sprite-buttons">
                                         <button class="stvp-sprite-url menu_button" id="stvp-walk-sprite-url" title="URL로 등록"><i class="fa-solid fa-link"></i></button>
-                                        <button class="stvp-sprite-clear menu_button" id="stvp-walk-sprite-clear" style="display:none;">✕</button>
+                                        <button class="stvp-sprite-clear menu_button" id="stvp-walk-sprite-clear" style="display:none;"><i class="fa-solid fa-xmark"></i></button>
                                     </div>
                                 </div>
                             </div>
@@ -267,7 +300,7 @@ export async function createUI() {
                     <!-- 공통 설정 (양쪽 펫 적용) -->
                     <div class="stvp-section">
                         <h5><i class="fa-solid fa-sliders"></i> 공통 설정</h5>
-                        <div class="stvp-info" style="margin-bottom:6px;">
+                        <div class="stvp-info" style="margin-bottom:8px;">
                             <small><i class="fa-solid fa-circle-info"></i> 멀티펫 사용 시 양쪽 펫 모두에게 적용됩니다</small>
                         </div>
                         <div class="stvp-row">
@@ -287,15 +320,14 @@ export async function createUI() {
                             <label class="stvp-toggle" for="stvp-bubble-enabled"></label>
                         </div>
                         <div class="stvp-row">
-                            <label>말풍선 표시 시간 (ms)</label>
+                            <label>말풍선 표시 시간</label>
                             <input type="number" id="stvp-bubble-duration" class="text_pole" min="1000" max="30000" step="500">
+                            <span style="font-size:0.8em;color:var(--SmartThemeEmColor);">ms</span>
                         </div>
-                    </div>
 
-                    <!-- 위치 -->
-                    <div class="stvp-section">
-                        <h5><i class="fa-solid fa-location-dot"></i> 위치</h5>
-                        <div class="stvp-row">
+                        <hr class="stvp-divider">
+                        <label class="stvp-subsection-title"><i class="fa-solid fa-location-dot"></i> 위치 & 이동</label>
+                        <div class="stvp-row" style="margin-top:8px;">
                             <label>위치 프리셋</label>
                             <select id="stvp-position" class="text_pole">
                                 ${positionPresetOptions}
@@ -306,15 +338,13 @@ export async function createUI() {
                             <input type="checkbox" id="stvp-draggable">
                             <label class="stvp-toggle" for="stvp-draggable"></label>
                         </div>
-                        <hr class="stvp-divider">
-                        <label class="stvp-subsection-title"><i class="fa-solid fa-person-walking"></i> 걷기</label>
-                        <div class="stvp-info" style="margin-bottom:4px;">
-                            <small><i class="fa-solid fa-lightbulb"></i> 펫이 주변을 천천히 돌아다닙니다. 잠자기/드래그 중에는 멈춥니다</small>
-                        </div>
-                        <div class="stvp-row" style="margin-top:4px;">
+                        <div class="stvp-row">
                             <label>걷기 사용</label>
                             <input type="checkbox" id="stvp-walk-enabled">
                             <label class="stvp-toggle" for="stvp-walk-enabled"></label>
+                        </div>
+                        <div class="stvp-info" style="margin-bottom:0;">
+                            <small><i class="fa-solid fa-person-walking"></i> 펫이 주변을 돌아다닙니다. 잠자기/드래그 중에는 멈춥니다</small>
                         </div>
                     </div>
 
@@ -327,44 +357,11 @@ export async function createUI() {
                             <label class="stvp-toggle" for="stvp-ai-enabled"></label>
                         </div>
                         <div class="stvp-info" style="margin-bottom:0;">
-                            <small><i class="fa-solid fa-triangle-exclamation"></i> ON 시 AI 응답마다 펫이 채팅을 읽고 반응합니다 (추가 API 호출 발생)</small>
-                        </div>
-                        
-                        <div class="stvp-row" style="margin-top:8px;">
-                            <label>반응 간격</label>
-                            <input type="range" id="stvp-reaction-interval" min="1" max="10" step="1">
-                            <span id="stvp-reaction-interval-label">3</span>번째 메시지마다
+                            <small><i class="fa-solid fa-triangle-exclamation"></i> ON 시 AI가 채팅을 읽고 펫이 반응합니다 (추가 API 호출)</small>
                         </div>
 
-                        <hr class="stvp-divider">
                         <div id="stvp-ai-settings" class="stvp-subsection">
-                            <label class="stvp-subsection-title">채팅 반응 설정</label>
-                            <div class="stvp-row" style="margin-top:8px;">
-                                <label>반응 모드</label>
-                                <select id="stvp-reaction-mode" class="text_pole">
-                                    <option value="observer">관전자 (비평/감상)</option>
-                                    <option value="character">속마음 (내면 독백)</option>
-                                </select>
-                            </div>
-                            <div class="stvp-info" style="margin-bottom:0;">
-                                <small><i class="fa-solid fa-eye"></i> 관전자: 채팅을 옆에서 보며 반응 | <i class="fa-solid fa-cloud"></i> 속마음: 캐릭터의 진짜 속마음</small>
-                            </div>
-
-                            <hr class="stvp-divider">
-                            <label class="stvp-subsection-title">프롬프트에 포함할 정보</label>
-                            <div class="stvp-row" style="margin-top:8px;">
-                                <label>이전 메시지 수</label>
-                                <input type="range" id="stvp-history-count" min="1" max="20" step="1">
-                                <span id="stvp-history-count-label">6</span>개
-                            </div>
-                            <div class="stvp-row">
-                                <label>월드인포 포함</label>
-                                <input type="checkbox" id="stvp-include-worldinfo">
-                                <label class="stvp-toggle" for="stvp-include-worldinfo"></label>
-                            </div>
-
-                            <hr class="stvp-divider">
-                            <label class="stvp-subsection-title">API 연결</label>
+                            <label class="stvp-subsection-title"><i class="fa-solid fa-plug"></i> API 연결</label>
                             <div class="stvp-row" style="margin-top:8px;">
                                 <label>Connection Manager</label>
                                 <input type="checkbox" id="stvp-use-cm">
@@ -378,45 +375,209 @@ export async function createUI() {
                             </div>
                             <div class="stvp-row">
                                 <label>최대 토큰</label>
-                                <input type="number" id="stvp-max-tokens" class="text_pole" min="50" max="200" step="10">
+                                <input type="number" id="stvp-max-tokens" class="text_pole" min="50" max="4096" step="50">
+                            </div>
+
+                            <hr class="stvp-divider">
+                            <label class="stvp-subsection-title"><i class="fa-solid fa-wand-magic-sparkles"></i> 채팅 반응 설정</label>
+                            <div class="stvp-row" style="margin-top:8px;">
+                                <label>반응 간격</label>
+                                <input type="range" id="stvp-reaction-interval" min="1" max="10" step="1">
+                                <span id="stvp-reaction-interval-label">3</span>번째 메시지마다
+                            </div>
+                            <div class="stvp-row">
+                                <label>반응 모드</label>
+                                <select id="stvp-reaction-mode" class="text_pole">
+                                    <option value="observer">관전자 (비평/감상)</option>
+                                    <option value="character">속마음 (내면 독백)</option>
+                                </select>
+                            </div>
+                            <div class="stvp-info" style="margin-bottom:0;">
+                                <small><i class="fa-solid fa-eye"></i> 관전자: 채팅을 옆에서 보며 반응 | <i class="fa-solid fa-cloud"></i> 속마음: 캐릭터의 속마음</small>
+                            </div>
+
+                            <hr class="stvp-divider">
+                            <label class="stvp-subsection-title"><i class="fa-solid fa-database"></i> 프롬프트 정보</label>
+                            <div class="stvp-row" style="margin-top:8px;">
+                                <label>이전 메시지 수</label>
+                                <input type="range" id="stvp-history-count" min="1" max="20" step="1">
+                                <span id="stvp-history-count-label">6</span>개
+                            </div>
+                            <div class="stvp-row">
+                                <label>월드인포 포함</label>
+                                <input type="checkbox" id="stvp-include-worldinfo">
+                                <label class="stvp-toggle" for="stvp-include-worldinfo"></label>
                             </div>
                         </div>
+                    </div>
+
+                    <!-- 알림/리마인드 -->
+                    <div class="stvp-section">
+                        <h5><i class="fa-solid fa-bell"></i> 알림 / 리마인드</h5>
+                        <div class="stvp-info" style="margin-bottom:8px;">
+                            <small><i class="fa-solid fa-circle-info"></i> 설정한 시간에 펫이 캐릭터 성격에 맞게 리마인드해줍니다 (1회 API 호출)</small>
+                        </div>
+                        <div id="stvp-reminder-list" class="stvp-reminder-list">
+                            <div class="stvp-reminder-empty"><i class="fa-solid fa-bell-slash"></i> 등록된 알림이 없습니다</div>
+                        </div>
+                        <div class="stvp-reminder-form" id="stvp-reminder-form" style="display:none;">
+                            <input type="hidden" id="stvp-reminder-edit-id" value="">
+                            <div style="display:flex; gap:4px; margin-bottom:8px;">
+                                <button type="button" class="menu_button stvp-reminder-mode-btn active" data-mode="time" style="flex:1; font-size:0.82em; padding:5px 8px;"><i class="fa-solid fa-clock"></i> 시각 지정</button>
+                                <button type="button" class="menu_button stvp-reminder-mode-btn" data-mode="interval" style="flex:1; font-size:0.82em; padding:5px 8px;"><i class="fa-solid fa-arrows-rotate"></i> 반복 간격</button>
+                            </div>
+                            <select id="stvp-reminder-mode" class="text_pole" style="display:none;">
+                                <option value="time">시각 지정</option>
+                                <option value="interval">반복 간격</option>
+                            </select>
+                            <div id="stvp-reminder-time-section">
+                                <div class="stvp-row" style="gap:6px; flex-wrap:nowrap;">
+                                    <input type="time" id="stvp-reminder-time" class="text_pole stvp-reminder-time-input">
+                                    <input type="text" id="stvp-reminder-message" class="text_pole" placeholder="예: 약 먹기, 스트레칭..." style="flex:1;" maxlength="50">
+                                </div>
+                                <div class="stvp-reminder-days" style="margin-top:6px;">
+                                    <div style="display:flex; align-items:center; gap:4px; flex-wrap:wrap;">
+                                        <div class="stvp-day-buttons">
+                                            <button class="stvp-day-btn" data-day="1">월</button>
+                                            <button class="stvp-day-btn" data-day="2">화</button>
+                                            <button class="stvp-day-btn" data-day="3">수</button>
+                                            <button class="stvp-day-btn" data-day="4">목</button>
+                                            <button class="stvp-day-btn" data-day="5">금</button>
+                                            <button class="stvp-day-btn" data-day="6">토</button>
+                                            <button class="stvp-day-btn" data-day="0">일</button>
+                                        </div>
+                                        <div class="stvp-day-presets">
+                                            <button class="stvp-day-preset" data-preset="daily">매일</button>
+                                            <button class="stvp-day-preset" data-preset="weekdays">평일</button>
+                                            <button class="stvp-day-preset" data-preset="weekend">주말</button>
+                                            <button class="stvp-day-preset" data-preset="once">1회만</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="stvp-reminder-interval-section" style="display:none;">
+                                <div class="stvp-row" style="gap:6px; flex-wrap:nowrap;">
+                                    <input type="number" id="stvp-reminder-interval-min" class="text_pole" min="10" max="240" step="5" value="30" style="width:70px;">
+                                    <span style="white-space:nowrap;">분마다</span>
+                                    <input type="text" id="stvp-reminder-interval-message" class="text_pole" placeholder="예: 스트레칭, 물 마시기..." style="flex:1;" maxlength="50">
+                                </div>
+                                <div class="stvp-info" style="margin-top:4px; margin-bottom:0;">
+                                    <small><i class="fa-solid fa-circle-info"></i> 접속 중 설정한 간격마다 알림 (종료 시 리셋)</small>
+                                </div>
+                            </div>
+                            <div class="stvp-row" style="gap:6px; margin-top:6px;">
+                                <button class="menu_button" id="stvp-reminder-confirm" style="flex:1;"><i class="fa-solid fa-check"></i> <span id="stvp-reminder-confirm-label">추가</span></button>
+                                <button class="menu_button" id="stvp-reminder-cancel" style="flex:1;"><i class="fa-solid fa-xmark"></i> 취소</button>
+                            </div>
+                        </div>
+                        <div class="stvp-row" style="margin-top:6px;">
+                            <button class="menu_button" id="stvp-reminder-add-btn" style="width:100%;"><i class="fa-solid fa-plus"></i> 알림 추가</button>
+                        </div>
+                        <div class="stvp-row" style="margin-top:6px;">
+                            <label>알림 담당 펫</label>
+                            <select id="stvp-reminder-pet-id" class="text_pole" style="width:auto;">
+                                <option value="primary">메인 펫</option>
+                                <option value="secondary">2번째 펫</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- 꿈 & 일기 -->
+                    <div class="stvp-section">
+                        <h5><i class="fa-solid fa-book"></i> 꿈 & 일기</h5>
+                        <div class="stvp-info" style="margin-bottom:8px;">
+                            <small><i class="fa-solid fa-circle-info"></i> 꿈: 수면 중 자동 생성 (하루 최대 N회) | 일기: 수동 작성 혹은 자동 생성</small>
+                        </div>
+                        <div class="stvp-row">
+                            <label><i class="fa-solid fa-moon"></i> 꿈 시스템</label>
+                            <input type="checkbox" id="stvp-journal-dream-enabled" title="잠자는 동안 꿈을 꿉니다">
+                            <label class="stvp-toggle" for="stvp-journal-dream-enabled"></label>
+                        </div>
+                        <div class="stvp-row">
+                            <label>하루 최대 꿈</label>
+                            <input type="range" id="stvp-journal-max-dreams" min="0" max="10" step="1" title="0 = 무제한">
+                            <span id="stvp-journal-max-dreams-label">3</span>회
+                        </div>
+                        <hr class="stvp-divider">
+                        <div class="stvp-row">
+                            <label><i class="fa-solid fa-pen-fancy"></i> 일기 시스템</label>
+                            <input type="checkbox" id="stvp-journal-diary-enabled" title="일기를 쓸 수 있습니다">
+                            <label class="stvp-toggle" for="stvp-journal-diary-enabled"></label>
+                        </div>
+                        <div id="stvp-auto-diary-section" style="display:none;">
+                            <div class="stvp-row">
+                                <label><i class="fa-solid fa-user-pen"></i> 일기 작성 펫</label>
+                                <select id="stvp-diary-writer" class="text_pole" style="width:auto;">
+                                    <option value="primary">메인 펫만</option>
+                                    <option value="secondary">2번째 펫만</option>
+                                    <option value="both">둘 다</option>
+                                </select>
+                            </div>
+                            <hr class="stvp-divider">
+                            <label class="stvp-subsection-title"><i class="fa-solid fa-wand-magic-sparkles"></i> 자동 일기</label>
+                            <div class="stvp-info" style="margin-top:6px; margin-bottom:6px;">
+                                <small><i class="fa-solid fa-circle-info"></i> 조건 충족 시 하루 1회 자동 작성 (대화 N건 이상 + 접속 30분 이상)</small>
+                            </div>
+                            <div class="stvp-row">
+                                <label>자동 일기</label>
+                                <input type="checkbox" id="stvp-auto-diary-enabled">
+                                <label class="stvp-toggle" for="stvp-auto-diary-enabled"></label>
+                            </div>
+                            <div class="stvp-row">
+                                <label>최소 대화 횟수</label>
+                                <input type="range" id="stvp-auto-diary-min-chats" min="1" max="20" step="1">
+                                <span id="stvp-auto-diary-min-chats-label">5</span>건
+                            </div>
+                        </div>
+
                     </div>
 
                     <!-- 멀티펫 -->
                     <div class="stvp-section">
                         <h5><i class="fa-solid fa-cat"></i> 멀티펫</h5>
-                        <div class="stvp-info" style="margin-bottom:6px;">
-                            <small><i class="fa-solid fa-circle-info"></i> 저장된 프리셋 중 하나를 2번째 펫으로 불러옵니다 (최대 2마리)</small>
-                        </div>
                         <div class="stvp-row">
                             <label>멀티펫 사용</label>
                             <input type="checkbox" id="stvp-multi-enabled">
                             <label class="stvp-toggle" for="stvp-multi-enabled"></label>
                         </div>
+                        <div class="stvp-info" style="margin-bottom:0;">
+                            <small><i class="fa-solid fa-circle-info"></i> 저장된 프리셋 중 하나를 2번째 펫으로 불러옵니다 (최대 2마리)</small>
+                        </div>
                         <div id="stvp-multi-settings" class="stvp-subsection">
+                            <label class="stvp-subsection-title"><i class="fa-solid fa-paw"></i> 2번째 펫</label>
                             <div class="stvp-row" style="margin-top:6px;">
-                                <label>2번째 펫 프리셋</label>
+                                <label>프리셋 선택</label>
                                 <select id="stvp-multi-preset" class="text_pole">
                                     <option value="">-- 선택 --</option>
                                 </select>
                             </div>
-                            <div class="stvp-row">
-                                <button class="menu_button" id="stvp-multi-load" style="width:100%;"><i class="fa-solid fa-paw"></i> 2번째 펫 불러오기</button>
-                            </div>
-                            <div class="stvp-row">
-                                <button class="menu_button" id="stvp-multi-unload" style="width:100%; background: rgba(255, 80, 80, 0.12); border-color: rgba(255, 80, 80, 0.25);"><i class="fa-solid fa-xmark"></i> 2번째 펫 해제</button>
+                            <div class="stvp-row stvp-multi-action-buttons">
+                                <button class="menu_button" id="stvp-multi-load"><i class="fa-solid fa-paw"></i> 불러오기</button>
+                                <button class="menu_button stvp-danger-btn" id="stvp-multi-unload"><i class="fa-solid fa-xmark"></i> 해제</button>
                             </div>
                             <div id="stvp-multi-current-info" class="stvp-info" style="margin-top:4px; display:none;">
                                 <small><i class="fa-solid fa-paw"></i> 현재 2번째 펫: <b id="stvp-multi-current-name">없음</b></small>
                             </div>
 
                             <hr class="stvp-divider">
-                            <label class="stvp-subsection-title"><i class="fa-solid fa-bolt"></i> 채팅 반응</label>
-                            <div class="stvp-info" style="margin-top:4px; margin-bottom:6px;">
-                                <small><i class="fa-solid fa-circle-info"></i> AI 채팅에 어떤 펫이 반응할지 설정합니다</small>
+                            <label class="stvp-subsection-title"><i class="fa-solid fa-heart"></i> 관계 설정</label>
+                            <div class="stvp-row" style="margin-top:6px;">
+                                <label>메인펫↔멀티펫 관계</label>
+                                <input type="text" id="stvp-multi-pet-relation" class="text_pole" placeholder="예: 자매, 라이벌, 연인..." style="flex:1;">
                             </div>
-                            <div class="stvp-row">
+
+                            <hr class="stvp-divider">
+                            <label class="stvp-subsection-title"><i class="fa-solid fa-location-dot"></i> 2번째 펫 위치</label>
+                            <div class="stvp-row" style="margin-top:6px;">
+                                <label>위치 프리셋</label>
+                                <select id="stvp-multi-position" class="text_pole">
+                                    ${positionPresetOptions}
+                                </select>
+                            </div>
+
+                            <hr class="stvp-divider">
+                            <label class="stvp-subsection-title"><i class="fa-solid fa-bolt"></i> 채팅 반응</label>
+                            <div class="stvp-row" style="margin-top:6px;">
                                 <label>반응할 펫</label>
                                 <select id="stvp-multi-chat-reactor" class="text_pole">
                                     <option value="primary">1번째 펫만</option>
@@ -426,43 +587,38 @@ export async function createUI() {
                             </div>
 
                             <hr class="stvp-divider">
-                            <label class="stvp-subsection-title"><i class="fa-solid fa-comments"></i> 직접 대화 듀얼 반응</label>
-                            <div class="stvp-info" style="margin-top:4px; margin-bottom:6px;">
-                                <small><i class="fa-solid fa-circle-info"></i> 유저가 직접 대화할 때 두 펫 모두 반응합니다 (1회 API 호출)</small>
-                            </div>
-                            <div class="stvp-row">
+                            <label class="stvp-subsection-title"><i class="fa-solid fa-comments"></i> 직접 대화</label>
+                            <div class="stvp-row" style="margin-top:6px;">
                                 <label>듀얼 반응</label>
                                 <input type="checkbox" id="stvp-multi-dual-talk">
                                 <label class="stvp-toggle" for="stvp-multi-dual-talk"></label>
                             </div>
-
-                            <hr class="stvp-divider">
-                            <label class="stvp-subsection-title"><i class="fa-solid fa-location-dot"></i> 2번째 펫 위치</label>
-                            <div class="stvp-info" style="margin-top:4px; margin-bottom:6px;">
-                                <small><i class="fa-solid fa-circle-info"></i> 2번째 펫의 기본 위치 프리셋 (드래그 시 무시됨)</small>
-                            </div>
-                            <div class="stvp-row">
-                                <label>위치 프리셋</label>
-                                <select id="stvp-multi-position" class="text_pole">
-                                    ${positionPresetOptions}
-                                </select>
+                            <div class="stvp-info" style="margin-bottom:0;">
+                                <small><i class="fa-solid fa-circle-info"></i> 직접 대화 시 두 펫 모두 반응 (1회 API)</small>
                             </div>
 
                             <hr class="stvp-divider">
-                            <label class="stvp-subsection-title"><i class="fa-solid fa-rotate"></i> 펫끼리 자동 대화</label>
-                            <div class="stvp-info" style="margin-top:4px; margin-bottom:6px;">
-                                <small><i class="fa-solid fa-circle-info"></i> 두 펫이 주기적으로 자동 대화합니다 (1회 API 호출). 로그에 기록되며 펫이 기억합니다</small>
-                            </div>
-                            <div class="stvp-row">
+                            <label class="stvp-subsection-title"><i class="fa-solid fa-rotate"></i> 자동 대화</label>
+                            <div class="stvp-row" style="margin-top:6px;">
                                 <label>자동 대화</label>
                                 <input type="checkbox" id="stvp-multi-interpet-enabled">
                                 <label class="stvp-toggle" for="stvp-multi-interpet-enabled"></label>
                             </div>
                             <div class="stvp-row">
-                                <label>대화 간격 (분)</label>
-                                <input type="range" id="stvp-multi-interpet-interval" min="1" max="30" step="1">
+                                <label>대화 간격</label>
+                                <input type="range" id="stvp-multi-interpet-interval" min="3" max="30" step="1">
                                 <span id="stvp-multi-interpet-interval-label">5</span>분
                             </div>
+                            <div class="stvp-info" style="margin-bottom:0;">
+                                <small><i class="fa-solid fa-circle-info"></i> 두 펫이 주기적으로 자동 대화 (1회 API)</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 전체 초기화 -->
+                    <div class="stvp-section" style="margin-top:4px; margin-bottom:0;">
+                        <div class="stvp-row" style="margin-bottom:0;">
+                            <button class="menu_button" id="stvp-reset-all" style="width:100%; background: rgba(255, 80, 80, 0.12); border-color: rgba(255, 80, 80, 0.25); font-size:0.85em;" title="확장의 모든 설정을 초기화합니다"><i class="fa-solid fa-triangle-exclamation"></i> 모든 설정 초기화</button>
                         </div>
                     </div>
 
@@ -478,11 +634,11 @@ export async function createUI() {
                             <select id="stvp-log-filter" class="text_pole">
                                 <option value="all">전체</option>
                                 <option value="direct">직접 대화만</option>
-                                <option value="chat">현재 채팅방 반응만</option>
                                 <option value="interPet">펫끼리 대화만</option>
+                                <option value="notification">알림만</option>
+                                <option value="chat">현재 채팅방 반응만</option>
                             </select>
                         </div>
-                        <hr class="stvp-divider">
                         <div id="stvp-log-viewer" class="stvp-log-viewer">
                             <div class="stvp-log-empty"><i class="fa-solid fa-inbox"></i> 로그가 없습니다.</div>
                         </div>
@@ -491,18 +647,30 @@ export async function createUI() {
                             <span id="stvp-log-page-info">1 / 1</span>
                             <button class="menu_button stvp-log-page-btn" id="stvp-log-next" title="다음 페이지"><i class="fa-solid fa-chevron-right"></i></button>
                         </div>
-                        <hr class="stvp-divider">
-                        <label class="stvp-subsection-title"><i class="fa-solid fa-broom"></i> 로그 관리</label>
-                        <div class="stvp-row stvp-log-buttons" style="margin-top:6px;">
+                        <div class="stvp-row stvp-log-buttons" style="margin-top:8px;">
                             <button class="menu_button" id="stvp-log-refresh" title="새로고침"><i class="fa-solid fa-arrows-rotate"></i> 새로고침</button>
                             <button class="menu_button" id="stvp-log-clear-direct" title="직접 대화 로그 초기화"><i class="fa-solid fa-trash-can"></i> 직접 대화</button>
                             <button class="menu_button" id="stvp-log-clear-chat" title="현재 채팅방 로그 초기화"><i class="fa-solid fa-trash-can"></i> 채팅방</button>
+                            <button class="menu_button" id="stvp-log-clear-notification" title="알림 로그 초기화"><i class="fa-solid fa-trash-can"></i> 알림</button>
                             <button class="menu_button" id="stvp-log-clear-all" title="모든 로그 초기화"><i class="fa-solid fa-trash-can"></i> 전체</button>
                         </div>
                         <div class="stvp-info" style="margin-top:6px; margin-bottom:0;">
-                            <small><i class="fa-solid fa-circle-info"></i> 직접 대화는 펫별로 저장됩니다 | 채팅방 반응은 해당 채팅방에서만 표시</small>
+                            <small><i class="fa-solid fa-circle-info"></i> 각 펫은 <b>자신이 참여한 대화만</b> 기억합니다</small>
+                            <small style="display:block; margin-top:4px; opacity:0.8;">📌 직접 대화: 해당 펫과의 대화 최근 <b>30건</b></small>
+                            <small style="display:block; opacity:0.8;">📌 펫끼리 대화: 해당 펫이 참여한 대화 최근 <b>15건</b></small>
+                            <small style="display:block; opacity:0.8;">📌 알림: 리마인드 등 알림 기록 (대화 참고에는 사용되지 않음)</small>
+                            <small style="display:block; margin-top:2px; opacity:0.65;">→ AI가 응답할 때 이 로그를 참고해 반복을 피합니다</small>
                         </div>
                     </div>
+
+                    <!-- 일기장 열기 버튼 -->
+                    <div class="stvp-section" style="margin-bottom:0;">
+                        <button class="menu_button" id="stvp-open-journal-popup" style="width:100%; font-size:0.95em; padding:8px;" title="일기장 팝업 열기">
+                            <i class="fa-solid fa-book-open"></i> 일기장 열어보기
+                        </button>
+                    </div>
+
+
 
                 </div>
 
@@ -513,12 +681,7 @@ export async function createUI() {
                     </div>
                 </div>
 
-                <!-- 전체 초기화 (탭 밖) -->
-                <div class="stvp-section" style="margin-bottom:0;">
-                    <div class="stvp-row" style="margin-bottom:0;">
-                        <button class="menu_button" id="stvp-reset-all" style="width:100%; background: rgba(255, 80, 80, 0.12); border-color: rgba(255, 80, 80, 0.25); font-size:0.85em;" title="확장의 모든 설정을 초기화합니다"><i class="fa-solid fa-triangle-exclamation"></i> 모든 설정 초기화</button>
-                    </div>
-                </div>
+
 
             </div>
         </div>
@@ -527,6 +690,45 @@ export async function createUI() {
 
     // HTML 삽입
     $("#extensions_settings").append(settingsHtml);
+
+    // 일기장 팝업은 body에 직접 추가 (사이드 패널 overflow 영향 방지)
+    if (!document.getElementById("stvp-journal-popup-overlay")) {
+        const popupHtml = `
+        <div id="stvp-journal-popup-overlay" class="stvp-journal-popup-overlay" style="display:none;">
+            <div class="stvp-journal-popup">
+                <div class="stvp-journal-popup-header">
+                    <span class="stvp-journal-popup-title"><i class="fa-solid fa-book"></i> 일기장</span>
+                    <button class="stvp-journal-popup-close" id="stvp-journal-popup-close" title="닫기"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="stvp-journal-popup-tabs">
+                    <button class="stvp-jpopup-tab active" data-jtype="all"><i class="fa-solid fa-layer-group"></i> 전체</button>
+                    <button class="stvp-jpopup-tab" data-jtype="dream"><i class="fa-solid fa-moon"></i> 꿈</button>
+                    <button class="stvp-jpopup-tab" data-jtype="diary"><i class="fa-solid fa-pen-fancy"></i> 일기</button>
+                </div>
+                <div class="stvp-journal-popup-filter-bar">
+                    <select id="stvp-journal-pet-filter" class="text_pole stvp-jpopup-filter-select">
+                        <option value="all">전체</option>
+                    </select>
+                    <button class="menu_button stvp-jpopup-action-btn" id="stvp-journal-write-diary" title="일기 쓰기">
+                        <i class="fa-solid fa-pen-to-square"></i> 일기 쓰기
+                    </button>
+                </div>
+                <div id="stvp-journal-viewer" class="stvp-journal-viewer">
+                    <div class="stvp-journal-empty"><i class="fa-solid fa-feather-pointed"></i> 아직 기록이 없습니다.</div>
+                </div>
+                <div class="stvp-journal-pagination" id="stvp-journal-pagination" style="display:none;">
+                    <button class="menu_button stvp-journal-page-btn" id="stvp-journal-prev" title="이전"><i class="fa-solid fa-chevron-left"></i></button>
+                    <span id="stvp-journal-page-info">1 / 1</span>
+                    <button class="menu_button stvp-journal-page-btn" id="stvp-journal-next" title="다음"><i class="fa-solid fa-chevron-right"></i></button>
+                </div>
+                <div class="stvp-journal-popup-footer">
+                    <button class="menu_button stvp-jpopup-footer-btn" id="stvp-journal-refresh" title="새로고침"><i class="fa-solid fa-arrows-rotate"></i> 새로고침</button>
+                    <button class="menu_button stvp-jpopup-footer-btn stvp-jpopup-danger-btn" id="stvp-journal-clear-all" title="전체 삭제"><i class="fa-solid fa-trash-can"></i> 전체 삭제</button>
+                </div>
+            </div>
+        </div>`;
+        $(document.body).append(popupHtml);
+    }
 
     // 이벤트 바인딩
     bindUIEvents();
@@ -541,6 +743,7 @@ export async function createUI() {
     document.addEventListener("stvp-log-updated", () => {
         refreshLogViewer();
     });
+
     
     log("UI created");
 }
@@ -558,7 +761,7 @@ function createSpriteUploadHtml(moodId, label) {
             <input type="file" id="stvp-file-${moodId}" accept="image/*,.gif,.webp" style="display:none;">
             <div class="stvp-sprite-buttons">
                 <button class="stvp-sprite-url menu_button" data-mood="${moodId}" title="URL로 등록"><i class="fa-solid fa-link"></i></button>
-                <button class="stvp-sprite-clear menu_button" data-mood="${moodId}" style="display:none;">✕</button>
+                <button class="stvp-sprite-clear menu_button" data-mood="${moodId}" style="display:none;"><i class="fa-solid fa-xmark"></i></button>
             </div>
         </div>
     `;
@@ -956,6 +1159,69 @@ function bindUIEvents() {
         saveSettings();
     });
 
+    // === 개인 메모 태그 시스템 ===
+
+    // 태그 변경 시 반복 요일 행 표시/숨김
+    $("#stvp-memo-tag-select").on("change", function() {
+        const tag = $(this).val();
+        if (tag === "일정" || tag === "건강" || tag === "운동" || tag === "기타") {
+            $("#stvp-memo-days-row").show();
+        } else {
+            $("#stvp-memo-days-row").hide();
+            $(".stvp-memo-day-btn").removeClass("active");
+        }
+    });
+
+    // 반복 요일 버튼 토글
+    $(".stvp-memo-day-btn").on("click", function() {
+        $(this).toggleClass("active");
+    });
+
+    $("#stvp-memo-add-btn").on("click", function() {
+        const tag = $("#stvp-memo-tag-select").val();
+        const content = $("#stvp-memo-content-input").val().trim();
+        const date = $("#stvp-memo-date-input").val() || "";
+        if (!content) return;
+
+        if (!state.settings.personality.personalMemos) state.settings.personality.personalMemos = [];
+        const memo = { tag, content };
+        if (date) memo.date = date;
+
+        // 반복 요일 수집
+        const activeDays = [];
+        $(".stvp-memo-day-btn.active").each(function() {
+            activeDays.push(parseInt($(this).data("day")));
+        });
+        if (activeDays.length > 0) memo.recurDays = activeDays;
+
+        state.settings.personality.personalMemos.push(memo);
+        saveSettings();
+        renderMemoList();
+        $("#stvp-memo-content-input").val("");
+        $("#stvp-memo-date-input").val("");
+        $(".stvp-memo-day-btn").removeClass("active");
+        $("#stvp-memo-days-row").hide();
+        $("#stvp-memo-tag-select").val("메모");
+    });
+
+    // Enter키로도 추가
+    $("#stvp-memo-content-input").on("keydown", function(e) {
+        if (e.key === "Enter") {
+            e.preventDefault();
+            $("#stvp-memo-add-btn").trigger("click");
+        }
+    });
+
+    // 메모 삭제 (이벤트 위임)
+    $(document).on("click", ".stvp-memo-delete-btn", function() {
+        const idx = $(this).data("idx");
+        if (state.settings.personality.personalMemos) {
+            state.settings.personality.personalMemos.splice(idx, 1);
+            saveSettings();
+            renderMemoList();
+        }
+    });
+
     $("#stvp-reaction-mode").on("change", function() {
         state.settings.api.reactionMode = this.value;
         saveSettings();
@@ -1098,11 +1364,402 @@ function bindUIEvents() {
         }
     });
 
+    $("#stvp-log-clear-notification").on("click", function() {
+        if (confirm("알림 로그를 모두 삭제하시겠습니까?")) {
+            clearLogs("notification");
+            logCurrentPage = 1;
+            refreshLogViewer();
+        }
+    });
+
     $("#stvp-log-clear-all").on("click", function() {
         if (confirm("모든 대화 로그를 삭제하시겠습니까?")) {
             clearLogs("all");
             logCurrentPage = 1;
             refreshLogViewer();
+        }
+    });
+
+    // === 일기장 ===
+    // 꿈 ON/OFF 토글
+    $("#stvp-journal-dream-enabled").on("change", function() {
+        if (!state.settings.petJournal) state.settings.petJournal = {};
+        state.settings.petJournal.dreamEnabled = this.checked;
+        saveSettings();
+    });
+
+    // 하루 최대 꿈 횟수
+    $("#stvp-journal-max-dreams").on("input", function() {
+        const val = parseInt(this.value);
+        $("#stvp-journal-max-dreams-label").text(val === 0 ? "∞" : val);
+        if (!state.settings.petJournal) state.settings.petJournal = {};
+        state.settings.petJournal.maxDreamsPerDay = val;
+        saveSettings();
+    });
+
+    // 일기 ON/OFF 토글
+    $("#stvp-journal-diary-enabled").on("change", function() {
+        if (!state.settings.petJournal) state.settings.petJournal = {};
+        state.settings.petJournal.diaryEnabled = this.checked;
+        $("#stvp-auto-diary-section").toggle(this.checked);
+        saveSettings();
+    });
+
+    // === 알림/리마인드 ===
+    // 요일 버튼 토글
+    $(document).on("click", ".stvp-day-btn", function() {
+        $(this).toggleClass("active");
+    });
+
+    // 프리셋 버튼 (매일/평일/주말/1회)
+    $(document).on("click", ".stvp-day-preset", function() {
+        const preset = $(this).data("preset");
+        const $btns = $(".stvp-day-btn");
+        $btns.removeClass("active");
+        if (preset === "daily") {
+            $btns.addClass("active");
+        } else if (preset === "weekdays") {
+            $btns.filter("[data-day='1'],[data-day='2'],[data-day='3'],[data-day='4'],[data-day='5']").addClass("active");
+        } else if (preset === "weekend") {
+            $btns.filter("[data-day='0'],[data-day='6']").addClass("active");
+        }
+        // once = 모두 비선택 (days 빈 배열)
+    });
+
+    // 폼 열기 (추가 모드)
+    $("#stvp-reminder-add-btn").on("click", function() {
+        $("#stvp-reminder-edit-id").val("");
+        $("#stvp-reminder-confirm-label").text("추가");
+        // 모드 초기화
+        $("#stvp-reminder-mode").val("time");
+        $("#stvp-reminder-time-section").show();
+        $("#stvp-reminder-interval-section").hide();
+        const now = new Date();
+        now.setHours(now.getHours() + 1);
+        const hh = String(now.getHours()).padStart(2, "0");
+        const mm = String(now.getMinutes()).padStart(2, "0");
+        $("#stvp-reminder-time").val(`${hh}:${mm}`);
+        $("#stvp-reminder-message").val("");
+        $("#stvp-reminder-interval-min").val(30);
+        $("#stvp-reminder-interval-message").val("");
+        // 기본: 매일
+        $(".stvp-day-btn").addClass("active");
+        $("#stvp-reminder-form").slideDown(150);
+        $(this).hide();
+        $("#stvp-reminder-message").focus();
+    });
+
+    // 알림 모드 전환 (시각 지정 / 반복 간격) — 버튼 토글
+    $(".stvp-reminder-mode-btn").on("click", function() {
+        const mode = $(this).data("mode");
+        $(".stvp-reminder-mode-btn").removeClass("active");
+        $(this).addClass("active");
+        $("#stvp-reminder-mode").val(mode).trigger("change");
+    });
+
+    $("#stvp-reminder-mode").on("change", function() {
+        const mode = $(this).val();
+        if (mode === "interval") {
+            $("#stvp-reminder-time-section").hide();
+            $("#stvp-reminder-interval-section").show();
+        } else {
+            $("#stvp-reminder-time-section").show();
+            $("#stvp-reminder-interval-section").hide();
+        }
+    });
+
+    // 폼 닫기
+    $("#stvp-reminder-cancel").on("click", function() {
+        $("#stvp-reminder-form").slideUp(150);
+        $("#stvp-reminder-add-btn").show();
+    });
+
+    // 추가 또는 수정 확인
+    $("#stvp-reminder-confirm").on("click", function() {
+        const editId = $("#stvp-reminder-edit-id").val();
+        const mode = $("#stvp-reminder-mode").val();
+
+        if (!state.settings.reminders) state.settings.reminders = [];
+
+        if (mode === "interval") {
+            // 반복 간격 모드
+            const intervalMin = parseInt($("#stvp-reminder-interval-min").val()) || 30;
+            const message = $("#stvp-reminder-interval-message").val().trim();
+            if (!message) { alert("리마인드 내용을 입력해주세요."); return; }
+            if (intervalMin < 10) { alert("최소 간격은 10분입니다."); return; }
+
+            if (editId) {
+                const reminder = state.settings.reminders.find(r => r.id === editId);
+                if (reminder) {
+                    reminder.mode = "interval";
+                    reminder.intervalMinutes = intervalMin;
+                    reminder.message = message;
+                    reminder.time = null;
+                    reminder.days = null;
+                    reminder.lastIntervalTrigger = null;
+                }
+            } else {
+                if (state.settings.reminders.length >= 10) {
+                    alert("알림은 최대 10개까지 등록할 수 있습니다.");
+                    return;
+                }
+                state.settings.reminders.push({
+                    id: "rem_" + Date.now(),
+                    mode: "interval",
+                    intervalMinutes: intervalMin,
+                    message,
+                    time: null,
+                    days: null,
+                    enabled: true,
+                    lastTriggered: null,
+                    lastIntervalTrigger: null,
+                });
+            }
+        } else {
+            // 시각 지정 모드 (기존)
+            const time = $("#stvp-reminder-time").val();
+            const message = $("#stvp-reminder-message").val().trim();
+
+            if (!time) { alert("시간을 설정해주세요."); return; }
+            if (!message) { alert("리마인드 내용을 입력해주세요."); return; }
+
+            const days = [];
+            $(".stvp-day-btn.active").each(function() {
+                days.push(parseInt($(this).data("day")));
+            });
+
+            if (editId) {
+                const reminder = state.settings.reminders.find(r => r.id === editId);
+                if (reminder) {
+                    reminder.mode = "time";
+                    reminder.time = time;
+                    reminder.message = message;
+                    reminder.days = days;
+                    reminder.lastTriggered = null;
+                }
+            } else {
+                if (state.settings.reminders.length >= 10) {
+                    alert("알림은 최대 10개까지 등록할 수 있습니다.");
+                    return;
+                }
+                state.settings.reminders.push({
+                    id: "rem_" + Date.now(),
+                    mode: "time",
+                    time,
+                    message,
+                    days,
+                    enabled: true,
+                    lastTriggered: null,
+                });
+            }
+        }
+
+        saveSettings();
+        refreshReminderList();
+        $("#stvp-reminder-form").slideUp(150);
+        $("#stvp-reminder-add-btn").show();
+        import("./pet-reactions.js").then(({ restartReminderTimer }) => restartReminderTimer());
+    });
+
+    // 알림 리스트 내 토글 (이벤트 위임)
+    $(document).on("change", ".stvp-reminder-toggle", function() {
+        const id = $(this).data("rid");
+        const reminder = (state.settings.reminders || []).find(r => r.id === id);
+        if (reminder) {
+            reminder.enabled = this.checked;
+            if (this.checked) reminder.lastTriggered = null;
+            saveSettings();
+            refreshReminderList();
+            import("./pet-reactions.js").then(({ restartReminderTimer }) => restartReminderTimer());
+        }
+    });
+
+    // 알림 수정 (이벤트 위임)
+    $(document).on("click", ".stvp-reminder-edit", function() {
+        const id = $(this).data("rid");
+        const reminder = (state.settings.reminders || []).find(r => r.id === id);
+        if (!reminder) return;
+
+        // 폼에 값 채우기
+        $("#stvp-reminder-edit-id").val(id);
+        $("#stvp-reminder-confirm-label").text("저장");
+
+        if (reminder.mode === "interval") {
+            $("#stvp-reminder-mode").val("interval");
+            $("#stvp-reminder-time-section").hide();
+            $("#stvp-reminder-interval-section").show();
+            $("#stvp-reminder-interval-min").val(reminder.intervalMinutes || 30);
+            $("#stvp-reminder-interval-message").val(reminder.message);
+        } else {
+            $("#stvp-reminder-mode").val("time");
+            $("#stvp-reminder-time-section").show();
+            $("#stvp-reminder-interval-section").hide();
+            $("#stvp-reminder-time").val(reminder.time);
+            $("#stvp-reminder-message").val(reminder.message);
+        }
+
+        // 요일 버튼 세팅
+        $(".stvp-day-btn").removeClass("active");
+        const days = reminder.days || [];
+        days.forEach(d => $(`.stvp-day-btn[data-day='${d}']`).addClass("active"));
+
+        $("#stvp-reminder-form").slideDown(150);
+        $("#stvp-reminder-add-btn").hide();
+    });
+
+    // 알림 삭제 (이벤트 위임)
+    $(document).on("click", ".stvp-reminder-delete", function() {
+        const id = $(this).data("rid");
+        if (!state.settings.reminders) return;
+        state.settings.reminders = state.settings.reminders.filter(r => r.id !== id);
+        saveSettings();
+        refreshReminderList();
+        import("./pet-reactions.js").then(({ restartReminderTimer }) => restartReminderTimer());
+    });
+
+    // 외부에서 알림 상태 변경 시 UI 갱신
+    document.addEventListener("stvp-reminders-updated", () => refreshReminderList());
+
+    // 알림 담당 펫 선택
+    $("#stvp-reminder-pet-id").on("change", function() {
+        state.settings.reminderPetId = this.value;
+        saveSettings();
+    });
+
+    // === 일기 작성 펫 ===
+    $("#stvp-diary-writer").on("change", function() {
+        if (!state.settings.petJournal) state.settings.petJournal = {};
+        state.settings.petJournal.diaryWriter = this.value;
+        saveSettings();
+    });
+
+    // === 자동 일기 ===
+    $("#stvp-auto-diary-enabled").on("change", function() {
+        if (!state.settings.autoDiary) state.settings.autoDiary = {};
+        state.settings.autoDiary.enabled = this.checked;
+        saveSettings();
+    });
+
+    $("#stvp-auto-diary-min-chats").on("input", function() {
+        const val = parseInt(this.value);
+        $("#stvp-auto-diary-min-chats-label").text(val);
+        if (!state.settings.autoDiary) state.settings.autoDiary = {};
+        state.settings.autoDiary.minChats = val;
+        saveSettings();
+    });
+
+    // 일기장 팝업 열기
+    $("#stvp-open-journal-popup").on("click", function(e) {
+        e.stopPropagation();
+        journalCurrentPage = 1;
+        journalTypeFilter = "all";
+        $(".stvp-jpopup-tab").removeClass("active");
+        $(".stvp-jpopup-tab[data-jtype='all']").addClass("active");
+        updateJournalPetFilter();
+        refreshJournalViewer();
+        $("#stvp-journal-popup-overlay").fadeIn(200);
+    });
+
+    // 일기장 팝업 닫기
+    $("#stvp-journal-popup-close").on("click", function() {
+        $("#stvp-journal-popup-overlay").fadeOut(150);
+    });
+    $("#stvp-journal-popup-overlay").on("click", function(e) {
+        if (e.target === this) $(this).fadeOut(150);
+    });
+
+    // 팝업 내부 탭 전환 (전체 / 꿈 / 일기)
+    $(document).on("click", ".stvp-jpopup-tab", function() {
+        $(".stvp-jpopup-tab").removeClass("active");
+        $(this).addClass("active");
+        journalTypeFilter = $(this).data("jtype");
+        journalCurrentPage = 1;
+        refreshJournalViewer();
+    });
+
+    // 펫 필터 변경
+    $("#stvp-journal-pet-filter").on("change", function() {
+        journalCurrentPage = 1;
+        refreshJournalViewer();
+    });
+
+    // 새로고침
+    $("#stvp-journal-refresh").on("click", function() {
+        updateJournalPetFilter();
+        refreshJournalViewer();
+    });
+
+    // 페이지네이션
+    $("#stvp-journal-prev").on("click", function() {
+        if (journalCurrentPage > 1) { journalCurrentPage--; refreshJournalViewer(); }
+    });
+    $("#stvp-journal-next").on("click", function() {
+        journalCurrentPage++;
+        refreshJournalViewer();
+    });
+
+    // 일기 쓰기 버튼
+    $("#stvp-journal-write-diary").on("click", async function() {
+        if (!state.settings.petJournal?.diaryEnabled) {
+            alert("일기 시스템이 비활성화 상태입니다.");
+            return;
+        }
+        const btn = $(this);
+        btn.prop("disabled", true).html('<i class="fa-solid fa-spinner fa-spin"></i> 작성 중...');
+
+        const writer = state.settings.petJournal?.diaryWriter || "primary";
+        const targets = [];
+        if (writer === "primary" || writer === "both") targets.push("primary");
+        if ((writer === "secondary" || writer === "both") && state.settings.multiPet?.enabled) targets.push("secondary");
+        // secondary인데 멀티펫이 꺼져있으면 primary로 대체
+        if (targets.length === 0) targets.push("primary");
+
+        try {
+            const { setState, PET_STATES } = await import("./pet-animation.js");
+            const { showSpeechBubble } = await import("./pet-speech.js");
+            const written = [];
+
+            for (const petId of targets) {
+                const isSecond = petId === "secondary";
+                const petName = isSecond
+                    ? (state.settings.multiPet?.secondPetData?.personality?.name || "펫2")
+                    : (state.settings.personality?.name || "미유");
+
+                const result = await generateDiary(petId);
+                if (result && result.diary) {
+                    saveDiary(petName, result.diary);
+                    written.push(petName);
+
+                    // 완료 코멘트 말풍선 표시
+                    if (result.comment) {
+                        setState(PET_STATES.HAPPY, 3000, petId);
+                        showSpeechBubble(result.comment, 8000, true, petId);
+                    }
+                }
+            }
+
+            journalCurrentPage = 1;
+            refreshJournalViewer();
+
+            if (written.length > 0) {
+                alert(`${written.join(", ")}의 일기가 작성되었습니다!`);
+            } else {
+                alert("일기 생성에 실패했습니다. 대화 로그가 충분한지 확인해주세요.");
+            }
+        } catch (err) {
+            log("Diary write error: " + err.message);
+            alert("일기 생성 중 오류가 발생했습니다.");
+        } finally {
+            btn.prop("disabled", false).html('<i class="fa-solid fa-pen-to-square"></i> 일기 쓰기');
+        }
+    });
+
+    // 전체 삭제
+    $("#stvp-journal-clear-all").on("click", function() {
+        if (confirm("일기장의 모든 기록(꿈 + 일기)을 삭제하시겠습니까?")) {
+            clearJournal();
+            journalCurrentPage = 1;
+            refreshJournalViewer();
         }
     });
 
@@ -1162,6 +1819,13 @@ function bindUIEvents() {
     $("#stvp-multi-dual-talk").on("change", function() {
         if (!state.settings.multiPet) return;
         state.settings.multiPet.dualDirectTalk = this.checked;
+        saveSettings();
+    });
+
+    // 펫 관계 설정
+    $("#stvp-multi-pet-relation").on("change", function() {
+        if (!state.settings.multiPet) return;
+        state.settings.multiPet.petRelation = this.value.trim();
         saveSettings();
     });
 
@@ -1251,10 +1915,11 @@ function refreshLogViewer() {
                     const [first, second] = entry.timestamp <= next.timestamp ? [entry, next] : [next, entry];
                     const moodA = getMoodEmoji(first.mood);
                     const moodB = getMoodEmoji(second.mood);
-                    html += `<div class="stvp-log-entry stvp-log-direct stvp-log-dual" data-timestamp="${entry.timestamp}" data-timestamp2="${next.timestamp}" data-type="direct">
+                    html += `<div class="stvp-log-entry stvp-log-direct stvp-log-dual" data-timestamp="${entry.timestamp}" data-timestamp2="${next.timestamp}" data-type="direct" data-replay-text="${escapeAttr(first.petResponse)}" data-replay-mood="${first.mood || 'happy'}" data-replay-text2="${escapeAttr(second.petResponse)}" data-replay-mood2="${second.mood || 'happy'}">
                         <div class="stvp-log-header">
                             <span class="stvp-log-time"><i class="fa-regular fa-clock"></i> ${timeStr}</span>
                             <span class="stvp-log-badge stvp-log-badge-dual"><i class="fa-solid fa-comments"></i> 듀얼 직접대화</span>
+                            <button class="stvp-log-replay-btn" title="말풍선 다시 띄우기"><i class="fa-solid fa-rotate-right"></i></button>
                             <button class="stvp-log-delete-btn" title="이 로그 삭제"><i class="fa-solid fa-xmark"></i></button>
                         </div>
                         <div class="stvp-log-user"><i class="fa-solid fa-user"></i> ${escapeHtml(first.userText)}</div>
@@ -1267,34 +1932,57 @@ function refreshLogViewer() {
             }
             // 단일 직접대화 또는 짝 없는 듀얼 엔트리
             const speakerPrefix = entry.mode === "dual" ? `<b>${escapeHtml(entry.speaker || "펫")}</b> ` : "";
-            html += `<div class="stvp-log-entry stvp-log-direct" data-timestamp="${entry.timestamp}" data-type="direct">
+            html += `<div class="stvp-log-entry stvp-log-direct" data-timestamp="${entry.timestamp}" data-type="direct" data-replay-text="${escapeAttr(entry.petResponse)}" data-replay-mood="${entry.mood || 'happy'}">
                 <div class="stvp-log-header">
                     <span class="stvp-log-time"><i class="fa-regular fa-clock"></i> ${timeStr}</span>
-                    <span class="stvp-log-badge stvp-log-badge-direct"><i class="fa-solid fa-comment"></i> 직접대화 ${moodEmoji}</span>
+                    <span class="stvp-log-badge stvp-log-badge-direct"><i class="fa-solid fa-comment"></i> 직접대화</span>
+                    <button class="stvp-log-replay-btn" title="말풍선 다시 띄우기"><i class="fa-solid fa-rotate-right"></i></button>
                     <button class="stvp-log-delete-btn" title="이 로그 삭제"><i class="fa-solid fa-xmark"></i></button>
                 </div>
                 <div class="stvp-log-user"><i class="fa-solid fa-user"></i> ${escapeHtml(entry.userText)}</div>
-                <div class="stvp-log-pet"><i class="fa-solid fa-paw"></i> ${speakerPrefix}${escapeHtml(entry.petResponse)}</div>
+                <div class="stvp-log-pet"><i class="fa-solid fa-paw"></i> ${speakerPrefix}${moodEmoji} ${escapeHtml(entry.petResponse)}</div>
             </div>`;
         } else if (entry.type === "interPet") {
-            html += `<div class="stvp-log-entry stvp-log-interpet" data-timestamp="${entry.timestamp}" data-type="interPet">
+            const moodA = getMoodEmoji(entry.petAMood);
+            const moodB = getMoodEmoji(entry.petBMood);
+            html += `<div class="stvp-log-entry stvp-log-interpet" data-timestamp="${entry.timestamp}" data-type="interPet" data-replay-text="${escapeAttr(entry.petAText)}" data-replay-mood="${entry.petAMood || 'happy'}" data-replay-text2="${escapeAttr(entry.petBText)}" data-replay-mood2="${entry.petBMood || 'happy'}" data-replay-dual="1">
                 <div class="stvp-log-header">
                     <span class="stvp-log-time"><i class="fa-regular fa-clock"></i> ${timeStr}</span>
                     <span class="stvp-log-badge stvp-log-badge-interpet"><i class="fa-solid fa-rotate"></i> 펫끼리 대화</span>
+                    <button class="stvp-log-replay-btn" title="말풍선 다시 띄우기"><i class="fa-solid fa-rotate-right"></i></button>
                     <button class="stvp-log-delete-btn" title="이 로그 삭제"><i class="fa-solid fa-xmark"></i></button>
                 </div>
-                <div class="stvp-log-pet"><i class="fa-solid fa-paw"></i> <b>${escapeHtml(entry.petAName)}</b>: ${escapeHtml(entry.petAText)}</div>
-                <div class="stvp-log-pet"><i class="fa-solid fa-paw"></i> <b>${escapeHtml(entry.petBName)}</b>: ${escapeHtml(entry.petBText)}</div>
+                <div class="stvp-log-pet"><i class="fa-solid fa-paw"></i> <b>${escapeHtml(entry.petAName)}</b> ${moodA}: ${escapeHtml(entry.petAText)}</div>
+                <div class="stvp-log-pet"><i class="fa-solid fa-paw"></i> <b>${escapeHtml(entry.petBName)}</b> ${moodB}: ${escapeHtml(entry.petBText)}</div>
+            </div>`;
+        } else if (entry.type === "notification") {
+            const notifMood = getMoodEmoji(entry.mood);
+            const notifTypeLabel = getNotificationTypeLabel(entry.notificationType);
+            const speakerName = entry.petName ? `<b>${escapeHtml(entry.petName)}</b> ` : "";
+            html += `<div class="stvp-log-entry stvp-log-notification" data-timestamp="${entry.timestamp}" data-type="notification" data-replay-text="${escapeAttr(entry.petResponse)}" data-replay-mood="${entry.mood || 'happy'}">
+                <div class="stvp-log-header">
+                    <span class="stvp-log-time"><i class="fa-regular fa-clock"></i> ${timeStr}</span>
+                    <span class="stvp-log-badge stvp-log-badge-notification"><i class="fa-solid fa-bell"></i> ${notifTypeLabel}</span>
+                    <button class="stvp-log-replay-btn" title="말풍선 다시 띄우기"><i class="fa-solid fa-rotate-right"></i></button>
+                    <button class="stvp-log-delete-btn" title="이 로그 삭제"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="stvp-log-notif-message"><i class="fa-solid fa-clock"></i> ${escapeHtml(entry.message)}</div>
+                <div class="stvp-log-pet"><i class="fa-solid fa-paw"></i> ${speakerName}${notifMood} ${escapeHtml(entry.petResponse)}</div>
             </div>`;
         } else {
             const triggerLabel = getTriggerLabel(entry.trigger);
-            html += `<div class="stvp-log-entry stvp-log-reaction" data-timestamp="${entry.timestamp}" data-type="reaction">
+            const reactionMood = getMoodEmoji(entry.mood);
+            const badgeClass = "stvp-log-badge-reaction";
+            const badgeIcon = "fa-bolt";
+            const speakerName = entry.petName ? `<b>${escapeHtml(entry.petName)}</b> ` : "";
+            html += `<div class="stvp-log-entry stvp-log-reaction" data-timestamp="${entry.timestamp}" data-type="reaction" data-replay-text="${escapeAttr(entry.petResponse)}" data-replay-mood="${entry.mood || 'happy'}">
                 <div class="stvp-log-header">
                     <span class="stvp-log-time"><i class="fa-regular fa-clock"></i> ${timeStr}</span>
-                    <span class="stvp-log-badge stvp-log-badge-reaction"><i class="fa-solid fa-bolt"></i> ${triggerLabel}</span>
+                    <span class="stvp-log-badge ${badgeClass}"><i class="fa-solid ${badgeIcon}"></i> ${triggerLabel}</span>
+                    <button class="stvp-log-replay-btn" title="말풍선 다시 띄우기"><i class="fa-solid fa-rotate-right"></i></button>
                     <button class="stvp-log-delete-btn" title="이 로그 삭제"><i class="fa-solid fa-xmark"></i></button>
                 </div>
-                <div class="stvp-log-pet"><i class="fa-solid fa-paw"></i> ${escapeHtml(entry.petResponse)}</div>
+                <div class="stvp-log-pet"><i class="fa-solid fa-paw"></i> ${speakerName}${reactionMood} ${escapeHtml(entry.petResponse)}</div>
             </div>`;
         }
     }
@@ -1320,6 +2008,42 @@ function refreshLogViewer() {
             setTimeout(() => refreshLogViewer(), 200);
         });
     });
+
+    // 말풍선 다시 띄우기 버튼 이벤트
+    viewer.querySelectorAll(".stvp-log-replay-btn").forEach(btn => {
+        btn.addEventListener("click", function(e) {
+            e.stopPropagation();
+            // API 호출 중이면 우선순위 양보
+            if (state.isPetGenerating || state.isGenerating || state.secondPet?.isPetGenerating) {
+                log("Replay blocked: API call in progress");
+                return;
+            }
+            const entry = this.closest(".stvp-log-entry");
+            const text = entry.dataset.replayText;
+            const mood = entry.dataset.replayMood || "happy";
+            if (!text) return;
+
+            // 듀얼 (펫끼리 대화 / 듀얼 직접대화): 양쪽 펫 동시 재생
+            const text2 = entry.dataset.replayText2;
+            const mood2 = entry.dataset.replayMood2;
+            if (text2 && state.settings.multiPet?.enabled && state.settings.multiPet?.secondPetData) {
+                setState(mood, 3000, "primary");
+                showSpeechBubble(text, null, false, "primary");
+                setState(mood2 || "happy", 3000, "secondary");
+                showSpeechBubble(text2, null, false, "secondary");
+            } else {
+                setState(mood, 3000, "primary");
+                showSpeechBubble(text, null, false, "primary");
+            }
+
+            // 버튼 피드백
+            const icon = this.querySelector("i");
+            if (icon) {
+                icon.className = "fa-solid fa-check";
+                setTimeout(() => { icon.className = "fa-solid fa-rotate-right"; }, 1000);
+            }
+        });
+    });
     
     // 페이지네이션 UI 업데이트
     if (totalPages > 1) {
@@ -1329,6 +2053,194 @@ function refreshLogViewer() {
         $("#stvp-log-next").prop("disabled", logCurrentPage >= totalPages);
     } else {
         $("#stvp-log-pagination").hide();
+    }
+}
+
+
+
+/**
+ * 알림/리마인드 리스트 렌더링
+ */
+function refreshReminderList() {
+    const container = document.getElementById("stvp-reminder-list");
+    if (!container) return;
+
+    const reminders = state.settings.reminders || [];
+
+    if (reminders.length === 0) {
+        container.innerHTML = '<div class="stvp-reminder-empty"><i class="fa-solid fa-bell-slash"></i> 등록된 알림이 없습니다</div>';
+        return;
+    }
+
+    const dayNames = ["일", "월", "화", "수", "목", "금", "토"];
+
+    function getDaysLabel(r) {
+        // 이전 형식 호환 (repeat → days 마이그레이션)
+        let days = r.days;
+        if (!days && r.repeat) {
+            if (r.repeat === "daily") days = [0,1,2,3,4,5,6];
+            else if (r.repeat === "weekdays") days = [1,2,3,4,5];
+            else days = [];
+            r.days = days;
+            delete r.repeat;
+        }
+        if (!days || days.length === 0) return "1회";
+        if (days.length === 7) return "매일";
+        const sorted = [...days].sort((a, b) => a - b);
+        if (sorted.length === 5 && sorted.join(",") === "1,2,3,4,5") return "평일";
+        if (sorted.length === 2 && sorted.join(",") === "0,6") return "주말";
+        return sorted.map(d => dayNames[d]).join("");
+    }
+
+    let html = "";
+    for (const r of reminders) {
+        const disabledClass = r.enabled ? "" : "stvp-reminder-disabled";
+        const checkedAttr = r.enabled ? "checked" : "";
+        const isInterval = r.mode === "interval";
+        const timeDisplay = isInterval ? `${r.intervalMinutes || 30}분마다` : escapeHtml(r.time);
+        const daysLabel = isInterval ? "반복" : getDaysLabel(r);
+        html += `<div class="stvp-reminder-item ${disabledClass}" data-rid="${r.id}">
+            <div class="stvp-reminder-item-left">
+                <span class="stvp-reminder-item-time">${timeDisplay}</span>
+                <span class="stvp-reminder-item-repeat">${escapeHtml(daysLabel)}</span>
+                <span class="stvp-reminder-item-msg">${escapeHtml(r.message)}</span>
+            </div>
+            <div class="stvp-reminder-item-right">
+                <button class="stvp-reminder-edit" data-rid="${r.id}" title="수정"><i class="fa-solid fa-pen"></i></button>
+                <input type="checkbox" class="stvp-reminder-toggle" data-rid="${r.id}" id="stvp-rtoggle-${r.id}" ${checkedAttr}>
+                <label class="stvp-toggle stvp-toggle-sm" for="stvp-rtoggle-${r.id}"></label>
+                <button class="stvp-reminder-delete" data-rid="${r.id}" title="삭제"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+        </div>`;
+    }
+
+    container.innerHTML = html;
+}
+
+/**
+ * 일기장 펫 필터 드롭다운 업데이트
+ */
+function updateJournalPetFilter() {
+    const $select = $("#stvp-journal-pet-filter");
+    const currentVal = $select.val() || "all";
+    $select.empty();
+    $select.append('<option value="all">전체</option>');
+
+    const petNames = getJournalPetNames();
+    petNames.forEach(name => {
+        $select.append(`<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`);
+    });
+
+    // 기존 선택 복원 (여전히 있으면)
+    if (petNames.includes(currentVal)) {
+        $select.val(currentVal);
+    }
+}
+
+/**
+ * 일기장 뷰어 갱신
+ */
+function refreshJournalViewer() {
+    const viewer = document.getElementById("stvp-journal-viewer");
+    if (!viewer) return;
+
+    const petFilter = $("#stvp-journal-pet-filter").val() || "all";
+    const typeFilter = journalTypeFilter || "all";
+
+    let entries = getJournalEntries();
+
+    if (petFilter !== "all") {
+        entries = entries.filter(e => e.petName === petFilter);
+    }
+    if (typeFilter !== "all") {
+        entries = entries.filter(e => e.type === typeFilter);
+    }
+
+    if (entries.length === 0) {
+        viewer.innerHTML = '<div class="stvp-journal-empty"><i class="fa-solid fa-feather-pointed"></i> 아직 기록이 없습니다.</div>';
+        $("#stvp-journal-pagination").hide();
+        journalCurrentPage = 1;
+        return;
+    }
+
+    // 최신순 정렬
+    entries.sort((a, b) => b.timestamp - a.timestamp);
+
+    const totalPages = Math.ceil(entries.length / JOURNAL_PAGE_SIZE);
+    if (journalCurrentPage > totalPages) journalCurrentPage = totalPages;
+    if (journalCurrentPage < 1) journalCurrentPage = 1;
+
+    const startIdx = (journalCurrentPage - 1) * JOURNAL_PAGE_SIZE;
+    const endIdx = Math.min(startIdx + JOURNAL_PAGE_SIZE, entries.length);
+    const pageItems = entries.slice(startIdx, endIdx);
+
+    let html = "";
+
+    for (const entry of pageItems) {
+        const date = new Date(entry.timestamp);
+        const dateStr = date.toLocaleString("ko-KR", {
+            year: "numeric", month: "short", day: "numeric",
+            hour: "2-digit", minute: "2-digit",
+        });
+
+        const isDream = entry.type === "dream";
+        let typeIcon, typeLabel, cardClass;
+
+        if (isDream) {
+            typeIcon = '<i class="fa-solid fa-moon"></i>';
+            typeLabel = "꿈";
+            cardClass = "stvp-journal-card-dream";
+        } else {
+            typeIcon = '<i class="fa-solid fa-pen-fancy"></i>';
+            typeLabel = "일기";
+            cardClass = "stvp-journal-card-diary";
+        }
+
+        const sleepTalkHtml = (isDream && entry.sleepTalk)
+            ? `<div class="stvp-journal-sleeptalk"><i class="fa-solid fa-comment-dots"></i> 잠꼬대: "${escapeHtml(entry.sleepTalk)}"</div>`
+            : "";
+
+        const contentHtml = `<div class="stvp-journal-card-content">${escapeHtml(entry.content)}</div>`;
+
+        html += `<div class="stvp-journal-card ${cardClass}" data-timestamp="${entry.timestamp}" data-type="${entry.type}">
+            <div class="stvp-journal-card-header">
+                <span class="stvp-journal-card-type">${typeIcon} ${typeLabel}</span>
+                <span class="stvp-journal-card-pet"><i class="fa-solid fa-paw"></i> ${escapeHtml(entry.petName)}</span>
+                <span class="stvp-journal-card-date"><i class="fa-regular fa-clock"></i> ${dateStr}</span>
+                <button class="stvp-journal-delete-btn" title="삭제"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            ${sleepTalkHtml}
+            ${contentHtml}
+        </div>`;
+    }
+
+    viewer.innerHTML = html;
+
+    // 개별 삭제 이벤트
+    viewer.querySelectorAll(".stvp-journal-delete-btn").forEach(btn => {
+        btn.addEventListener("click", function(e) {
+            e.stopPropagation();
+            const card = this.closest(".stvp-journal-card");
+            const timestamp = parseInt(card.dataset.timestamp);
+            const type = card.dataset.type;
+
+            deleteJournalEntry(timestamp, type);
+
+            card.style.transition = "opacity 0.2s, transform 0.2s";
+            card.style.opacity = "0";
+            card.style.transform = "translateX(20px)";
+            setTimeout(() => refreshJournalViewer(), 200);
+        });
+    });
+
+    // 페이지네이션
+    if (totalPages > 1) {
+        $("#stvp-journal-pagination").show();
+        $("#stvp-journal-page-info").text(`${journalCurrentPage} / ${totalPages}`);
+        $("#stvp-journal-prev").prop("disabled", journalCurrentPage <= 1);
+        $("#stvp-journal-next").prop("disabled", journalCurrentPage >= totalPages);
+    } else {
+        $("#stvp-journal-pagination").hide();
     }
 }
 
@@ -1368,11 +2280,30 @@ function getTriggerLabel(trigger) {
 }
 
 /**
+ * 알림 타입 라벨 가져오기
+ */
+function getNotificationTypeLabel(notificationType) {
+    const labels = {
+        reminder: "리마인드",
+        hungry: "배고픔 알림",
+    };
+    return labels[notificationType] || "알림";
+}
+
+/**
  * HTML 이스케이프
  */
 function escapeHtml(text) {
     if (!text) return "";
     return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+/**
+ * HTML 속성값 이스케이프 (data-* 속성용)
+ */
+function escapeAttr(text) {
+    if (!text) return "";
+    return text.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/'/g, "&#39;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 /**
@@ -1441,6 +2372,7 @@ function updateUIValues() {
     $("#stvp-user-relation").val(s.personality.userRelation || "");
     $("#stvp-owner-name").val(s.personality.ownerName || "");
     $("#stvp-owner-persona").val(s.personality.ownerPersona || "");
+    renderMemoList();
     $("#stvp-reaction-mode").val(s.api.reactionMode || "observer");
     $("#stvp-include-worldinfo").prop("checked", s.api.includeWorldInfo || false);
     $("#stvp-history-count").val(s.api.historyCount || 6);
@@ -1470,6 +2402,7 @@ function updateUIValues() {
     $("#stvp-multi-enabled").prop("checked", mp.enabled || false);
     $("#stvp-multi-chat-reactor").val(mp.chatReactor || "primary");
     $("#stvp-multi-dual-talk").prop("checked", mp.dualDirectTalk || false);
+    $("#stvp-multi-pet-relation").val(mp.petRelation || "");
     $("#stvp-multi-interpet-enabled").prop("checked", mp.interPetChat?.enabled || false);
     $("#stvp-multi-interpet-interval").val(mp.interPetChat?.interval || 5);
     $("#stvp-multi-interpet-interval-label").text(mp.interPetChat?.interval || 5);
@@ -1481,6 +2414,28 @@ function updateUIValues() {
     // 대화 로그
     refreshLogViewer();
     
+    // 일기장
+    const journal = state.settings.petJournal || {};
+    $("#stvp-journal-dream-enabled").prop("checked", journal.dreamEnabled !== false);
+    const maxDreams = journal.maxDreamsPerDay ?? 3;
+    $("#stvp-journal-max-dreams").val(maxDreams);
+    $("#stvp-journal-max-dreams-label").text(maxDreams === 0 ? "∞" : maxDreams);
+    $("#stvp-journal-diary-enabled").prop("checked", journal.diaryEnabled !== false);
+    $("#stvp-auto-diary-section").toggle(journal.diaryEnabled !== false);
+    $("#stvp-diary-writer").val(journal.diaryWriter || "primary");
+    updateJournalPetFilter();
+    refreshJournalViewer();
+
+    // 알림/리마인드
+    refreshReminderList();
+    $("#stvp-reminder-pet-id").val(s.reminderPetId || "primary");
+
+    // 자동 일기
+    const ad = s.autoDiary || {};
+    $("#stvp-auto-diary-enabled").prop("checked", ad.enabled || false);
+    $("#stvp-auto-diary-min-chats").val(ad.minChats || 5);
+    $("#stvp-auto-diary-min-chats-label").text(ad.minChats || 5);
+
     // 모바일 알림
     updateMobileNotice();
 }
@@ -1574,5 +2529,53 @@ function updateMultiPetInfo() {
     } else {
         $("#stvp-multi-current-name").text("없음");
         $("#stvp-multi-current-info").hide();
+    }
+}
+
+/**
+ * 개인 메모 리스트 렌더링
+ */
+function renderMemoList() {
+    const DAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
+    const container = $("#stvp-memo-list");
+    container.empty();
+    const memos = state.settings.personality.personalMemos || [];
+    if (memos.length === 0) {
+        container.append(`<div class="stvp-memo-empty">등록된 메모가 없습니다</div>`);
+        return;
+    }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    for (let i = 0; i < memos.length; i++) {
+        const m = memos[i];
+        const tag = $("<span>").addClass("stvp-memo-tag").text(m.tag);
+        const content = $("<span>").addClass("stvp-memo-content").text(m.content);
+        const del = $("<button>").addClass("stvp-memo-delete-btn menu_button")
+            .attr("data-idx", i).attr("title", "삭제")
+            .html('<i class="fa-solid fa-xmark"></i>');
+        const row = $("<div>").addClass("stvp-memo-item").append(tag);
+
+        // 날짜 표시
+        if (m.date) {
+            const dateSpan = $("<span>").addClass("stvp-memo-date").text(m.date);
+            row.append(dateSpan);
+            // 날짜가 지난 메모는 흐리게 (반복 요일이 있으면 흐리지 않음)
+            if (!m.recurDays || m.recurDays.length === 0) {
+                const memoDate = new Date(m.date + "T00:00:00");
+                if (memoDate < today) {
+                    row.addClass("stvp-memo-expired");
+                }
+            }
+        }
+
+        // 반복 요일 표시
+        if (m.recurDays && m.recurDays.length > 0) {
+            const dayStr = m.recurDays.map(d => DAY_NAMES[d]).join("/");
+            const recurSpan = $("<span>").addClass("stvp-memo-recur").text(`매주 ${dayStr}`);
+            row.append(recurSpan);
+        }
+
+        row.append(content, del);
+        container.append(row);
     }
 }

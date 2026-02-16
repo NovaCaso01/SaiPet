@@ -1,104 +1,43 @@
 /**
- * SaiPet - 스타일시트 v2.0
- * ─────────────────────────────────────────
- * 디자인 컨셉: Minimal Pastel / Cute
- * CSS 격리: #saipet-settings (설정 패널)
- *           #saipet-container / #saipet-container-2 (펫 런타임)
- *           .stvp-journal-popup-overlay (일기장 팝업)
- * ─────────────────────────────────────────
+ * SaiPet - 스타일시트
  */
 
-/* ╔══════════════════════════════════════════╗
-   ║  PART 1 — 설정 패널 (Settings Panel)     ║
-   ╚══════════════════════════════════════════╝ */
+/* ===== 설정 UI ===== */
 
-/* ── 파스텔 디자인 토큰 (불투명 고정색 — 다크테마 호환) ── */
 #saipet-settings {
-    --sp-primary: #7c9bff;
-    --sp-primary-light: #e8eeff;
-    --sp-primary-lighter: #f5f7fc;
-    --sp-accent-pink: #e8a0b8;
-    --sp-accent-mint: #7cc4b8;
-    --sp-accent-lavender: #a8a0d4;
-    --sp-accent-peach: #e8a0b8;
-    --sp-accent-yellow: #d4a040;
-    --sp-bg-card: #ffffff;
-    --sp-bg-sub: #f5f7fc;
-    --sp-bg-input: #ffffff;
-    --sp-border: #d8dce6;
-    --sp-border-hover: #b0b8cc;
-    --sp-text: #3a3f50;
-    --sp-text-dim: #8e93a3;
-    --sp-text-accent: #6f8ccc;
-    --sp-radius: 14px;
-    --sp-radius-sm: 10px;
-    --sp-radius-xs: 7px;
-    --sp-shadow-soft: 0 2px 12px rgba(100, 120, 180, 0.10);
-    --sp-transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-
     margin-bottom: 10px;
-    color: var(--sp-text);
-}
-
-/* ── 드로어 헤더 ── */
-#saipet-settings .inline-drawer-header {
-    border-radius: var(--sp-radius);
-    transition: background var(--sp-transition);
-}
-
-#saipet-settings .inline-drawer-header:hover {
-    background: var(--sp-primary-light);
 }
 
 #saipet-settings .inline-drawer-header b {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     font-size: 1em;
-    letter-spacing: 0.02em;
-}
-
-#saipet-settings .inline-drawer-header b i {
-    color: var(--sp-primary);
-    font-size: 0.95em;
 }
 
 /* ===== ON/OFF 헤더 토글 ===== */
 
 .stvp-header-toggle {
-    margin-bottom: 14px !important;
-    padding: 12px 16px !important;
-    background: var(--sp-primary-lighter);
-    border: 1.5px solid var(--sp-border);
-    border-radius: var(--sp-radius);
-    transition: border-color var(--sp-transition), box-shadow var(--sp-transition);
+    margin-bottom: 12px !important;
+    padding: 10px 14px !important;
+    background: rgba(var(--SmartThemeBodyColorRgb, 0,0,0), 0.04);
+    border: 1px solid var(--SmartThemeBorderColor, rgba(0,0,0,0.1));
+    border-radius: 10px;
 }
 
 .stvp-header-toggle .stvp-row > label:first-child {
-    color: var(--sp-text);
-}
-
-.stvp-header-toggle:hover {
-    border-color: var(--sp-border-hover);
-    box-shadow: var(--sp-shadow-soft);
-}
-
-.stvp-header-toggle .stvp-row > label:first-child {
-    font-weight: 700;
+    font-weight: 600;
     font-size: 0.92em;
-    color: var(--sp-text);
 }
 
 /* ===== 탭 메뉴 ===== */
 
 .stvp-tab-bar {
     display: flex;
-    gap: 4px;
-    margin-bottom: 16px;
-    padding: 4px;
-    background: var(--sp-bg-sub);
-    border-radius: var(--sp-radius);
-    border: 1px solid var(--sp-border);
+    gap: 2px;
+    margin-bottom: 14px;
+    border-bottom: 2px solid var(--SmartThemeBorderColor, #ddd);
+    padding-bottom: 0;
     overflow-x: auto;
     scrollbar-width: none;
 }
@@ -109,38 +48,31 @@
 
 .stvp-tab-btn {
     flex: 1;
-    padding: 9px 8px;
+    padding: 8px 6px;
     border: none;
     background: transparent;
-    color: var(--sp-text-dim);
+    color: var(--SmartThemeEmColor, #999);
     font-size: 0.82em;
     font-weight: 600;
     cursor: pointer;
-    border-radius: var(--sp-radius-sm);
-    transition: all var(--sp-transition);
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: color 0.15s, border-color 0.15s;
     white-space: nowrap;
     text-align: center;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
-    position: relative;
+    gap: 5px;
 }
 
 .stvp-tab-btn:hover {
-    color: var(--sp-text);
-    background: #e8eeff;
+    color: var(--SmartThemeBodyColor, #333);
 }
 
 .stvp-tab-btn.active {
-    color: var(--sp-primary);
-    background: #ffffff;
-    box-shadow: 0 1px 6px rgba(100, 120, 180, 0.14);
-    font-weight: 700;
-}
-
-.stvp-tab-btn i {
-    font-size: 0.95em;
+    color: var(--SmartThemeQuoteColor, #6fa8dc);
+    border-bottom-color: var(--SmartThemeQuoteColor, #6fa8dc);
 }
 
 .stvp-tab-content {
@@ -149,90 +81,60 @@
 
 .stvp-tab-content.active {
     display: block;
-    animation: spFadeIn 0.25s ease;
 }
 
-@keyframes spFadeIn {
-    from { opacity: 0; transform: translateY(4px); }
-    to   { opacity: 1; transform: translateY(0); }
-}
-
-/* ===== 섹션 카드 ===== */
+/* ===== 섹션 ===== */
 
 .stvp-section {
-    margin-bottom: 14px;
-    padding: 16px;
-    background: var(--sp-bg-card);
-    border: 1.5px solid var(--sp-border);
-    border-radius: var(--sp-radius);
-    box-shadow: var(--sp-shadow-soft);
-    transition: border-color var(--sp-transition), box-shadow var(--sp-transition);
+    margin-bottom: 16px;
+    padding: 14px;
+    background: var(--SmartThemeBlurTintColor);
+    border-radius: 10px;
     overflow: hidden;
 }
 
-.stvp-section:hover {
-    border-color: var(--sp-border-hover);
-    box-shadow: 0 4px 18px rgba(100, 120, 180, 0.12);
-}
-
-/* 섹션 제목 */
 .stvp-section h5 {
-    margin: 0 0 14px 0;
-    padding-bottom: 10px;
-    border-bottom: 1.5px solid var(--sp-border);
+    margin: 0 0 12px 0;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--SmartThemeBorderColor);
     font-size: 0.95em;
-    font-weight: 700;
     display: flex;
     align-items: center;
-    gap: 8px;
-    color: var(--sp-text);
-    letter-spacing: 0.01em;
+    gap: 6px;
+    color: var(--SmartThemeBodyColor);
 }
 
 .stvp-section h5 i {
-    color: var(--sp-primary);
-    font-size: 0.92em;
-    width: 20px;
-    text-align: center;
+    color: var(--SmartThemeQuoteColor, #6fa8dc);
+    font-size: 0.9em;
 }
 
-/* 서브섹션 */
 .stvp-subsection {
-    margin-top: 12px;
-    padding: 14px;
-    background: #f5f7fc;
-    border: 1px solid #d8dce6;
-    border-radius: var(--sp-radius-sm);
+    margin-top: 10px;
+    padding: 12px;
+    background: rgba(var(--SmartThemeBodyColorRgb, 0,0,0), 0.02);
+    border: 1px solid var(--SmartThemeBorderColor, rgba(0, 0, 0, 0.08));
+    border-radius: 8px;
     overflow: hidden;
-    transition: border-color var(--sp-transition);
-}
-
-.stvp-subsection:hover {
-    border-color: #b0b8cc;
 }
 
 .stvp-subsection-title {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 5px;
     font-size: 0.85em;
-    font-weight: 700;
-    color: var(--sp-text-accent);
-    margin-bottom: 4px;
-    padding-left: 10px;
-    border-left: 3px solid var(--sp-primary);
-    border-radius: 0 2px 2px 0;
-}
-
-.stvp-subsection-title i {
-    font-size: 0.88em;
+    font-weight: 600;
+    color: var(--SmartThemeQuoteColor);
+    margin-bottom: 2px;
+    padding-left: 8px;
+    border-left: 2px solid var(--SmartThemeQuoteColor, #6fa8dc);
 }
 
 .stvp-divider {
     border: none;
-    border-top: 1.5px solid var(--sp-border);
-    margin: 14px 0;
-    opacity: 0.5;
+    border-top: 1px solid var(--SmartThemeBorderColor);
+    margin: 12px 0;
+    opacity: 0.35;
 }
 
 /* ===== 행 레이아웃 ===== */
@@ -253,8 +155,7 @@
 .stvp-row > label:first-child {
     flex: 0 0 120px;
     font-size: 0.88em;
-    font-weight: 500;
-    color: var(--sp-text);
+    color: var(--SmartThemeBodyColor);
 }
 
 .stvp-row input[type="text"],
@@ -269,77 +170,56 @@
     flex: 1;
     min-width: 0;
     max-width: 100%;
-    accent-color: var(--sp-primary);
 }
 
 .stvp-row input[type="color"] {
-    width: 38px;
-    height: 28px;
+    width: 40px;
+    height: 30px;
     padding: 0;
-    border: 2px solid var(--sp-border);
-    border-radius: var(--sp-radius-xs);
+    border: none;
     cursor: pointer;
-    transition: border-color var(--sp-transition);
-}
-
-.stvp-row input[type="color"]:hover {
-    border-color: var(--sp-primary);
 }
 
 /* ===== 정보 박스 ===== */
 
 .stvp-info {
     margin-bottom: 8px;
-    padding: 8px 12px;
-    background: var(--sp-primary-lighter);
-    border-radius: var(--sp-radius-xs);
-    border-left: 3px solid #9db4ff;
-    transition: border-color var(--sp-transition);
-}
-
-.stvp-info:hover {
-    border-left-color: var(--sp-primary);
+    padding: 6px 10px;
+    background: rgba(var(--SmartThemeBodyColorRgb, 0,0,0), 0.03);
+    border-radius: 6px;
+    border-left: 3px solid rgba(var(--SmartThemeBodyColorRgb, 0,0,0), 0.08);
 }
 
 .stvp-info small {
-    color: #4a4f5e;
+    color: var(--SmartThemeEmColor, #888);
     font-size: 0.82em;
-    line-height: 1.55;
+    line-height: 1.5;
 }
 
 .stvp-info small i {
-    opacity: 0.65;
-    margin-right: 2px;
+    opacity: 0.7;
 }
 
 .stvp-export-info {
-    background: #f0eef8;
-    border-left: 3px solid #a8a0d4;
+    background: rgba(100, 180, 255, 0.06);
+    border-left: 3px solid var(--SmartThemeQuoteColor, #6fa8dc);
     line-height: 1.6;
 }
 
-/* ===== 프리셋 버튼 ===== */
-
+/* 프리셋 버튼 */
 .stvp-preset-buttons {
     flex-wrap: wrap;
-    gap: 6px !important;
+    gap: 5px !important;
 }
 
 .stvp-preset-buttons .menu_button {
     flex: 1;
     min-width: 80px;
-    font-size: 0.84em;
-    padding: 6px 10px;
-    border-radius: var(--sp-radius-xs) !important;
-    transition: all var(--sp-transition);
+    font-size: 0.85em;
+    padding: 5px 8px;
 }
 
-.stvp-preset-buttons .menu_button:hover {
-    box-shadow: 0 2px 8px rgba(124, 155, 255, 0.12);
-}
-
-/* ===== 로그 버튼 ===== */
-
+/* 로그 버튼 */
 .stvp-log-buttons {
     flex-wrap: wrap;
     gap: 5px !important;
@@ -349,60 +229,66 @@
     flex: 1;
     min-width: 70px;
     font-size: 0.82em;
-    padding: 5px 8px;
-    border-radius: var(--sp-radius-xs) !important;
+    padding: 4px 6px;
 }
 
-/* ===== 토글 스위치 ===== */
-
+/* 토글 스위치 */
 .stvp-toggle {
     position: relative;
     display: inline-block;
-    width: 42px;
-    height: 22px;
-    background: #d8dce6;
-    border-radius: 12px;
+    width: 40px;
+    height: 20px;
+    background: var(--SmartThemeBorderColor);
+    border-radius: 10px;
     cursor: pointer;
-    transition: background 0.25s ease, box-shadow 0.25s ease;
-    flex-shrink: 0;
+    transition: background 0.2s;
 }
 
 .stvp-toggle::after {
     content: "";
     position: absolute;
-    top: 3px;
-    left: 3px;
+    top: 2px;
+    left: 2px;
     width: 16px;
     height: 16px;
     background: white;
     border-radius: 50%;
-    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+    transition: transform 0.2s;
 }
 
 input[type="checkbox"]:checked + .stvp-toggle {
-    background: #7c9bff;
-    box-shadow: 0 0 0 2px #e8eeff;
+    background: var(--SmartThemeQuoteColor);
 }
 
 input[type="checkbox"]:checked + .stvp-toggle::after {
     transform: translateX(20px);
 }
 
-/* Virtual Pet 설정 내 체크박스 숨김 */
+/* Virtual Pet 설정 내 체크박스만 숨김 (토글 스위치로 대체) */
 #saipet-settings input[type="checkbox"] {
     display: none;
 }
 
-/* ===== 스프라이트 그리드 ===== */
-
+/* 스프라이트 그리드 */
 .stvp-sprite-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
-    gap: 8px 6px;
-    margin-top: 12px;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+    margin-top: 10px;
     box-sizing: border-box;
     width: 100%;
+}
+
+@media (max-width: 768px) {
+    .stvp-sprite-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+@media (max-width: 500px) {
+    .stvp-sprite-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
 }
 
 .stvp-sprite-item {
@@ -412,35 +298,30 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     gap: 3px;
     min-width: 0;
     overflow: hidden;
-    max-width: 100%;
 }
 
 .stvp-sprite-label {
-    font-size: 0.73em;
-    font-weight: 600;
-    color: var(--sp-text-accent);
+    font-size: 0.75em;
+    color: var(--SmartThemeQuoteColor);
     white-space: nowrap;
-    letter-spacing: 0.01em;
 }
 
 .stvp-sprite-preview {
-    width: 48px;
-    height: 48px;
+    width: 50px;
+    height: 50px;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #f5f7fc;
-    border: 2px dashed #d8dce6;
-    border-radius: var(--sp-radius-sm);
+    background: var(--SmartThemeBlurTintColor);
+    border: 2px dashed var(--SmartThemeBorderColor);
+    border-radius: 8px;
     cursor: pointer;
     overflow: hidden;
-    transition: border-color var(--sp-transition), background var(--sp-transition), transform var(--sp-transition);
+    transition: border-color 0.2s;
 }
 
 .stvp-sprite-preview:hover {
-    border-color: #7c9bff;
-    background: #e8eeff;
-    transform: scale(1.04);
+    border-color: var(--SmartThemeQuoteColor);
 }
 
 .stvp-sprite-preview img {
@@ -450,36 +331,31 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
 }
 
 .stvp-sprite-placeholder {
-    font-size: 18px;
-    color: var(--sp-border);
-    font-weight: 300;
+    font-size: 20px;
+    color: var(--SmartThemeBorderColor);
 }
 
 .stvp-sprite-buttons {
     display: flex;
-    gap: 2px;
-    flex-wrap: nowrap;
-    justify-content: center;
-    max-width: 100%;
+    gap: 3px;
 }
 
-.stvp-sprite-url,
+.stvp-sprite-url {
+    padding: 1px 5px;
+    font-size: 0.7em;
+}
+
 .stvp-sprite-clear {
-    padding: 1px 3px;
-    font-size: 0.58em;
-    border-radius: var(--sp-radius-xs) !important;
-    min-width: unset !important;
-    white-space: nowrap;
-    flex-shrink: 0;
+    padding: 1px 6px;
+    font-size: 0.7em;
 }
 
-/* ===== 대사 설정 ===== */
-
+/* 대사 설정 */
 .stvp-speeches-container {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 10px;
-    margin-top: 12px;
+    margin-top: 10px;
 }
 
 @media (max-width: 600px) {
@@ -491,140 +367,28 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
 .stvp-speech-item {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 3px;
 }
 
 .stvp-speech-label {
-    font-size: 0.84em;
-    font-weight: 700;
-    color: var(--sp-text-accent);
+    font-size: 0.85em;
+    font-weight: bold;
+    color: var(--SmartThemeQuoteColor);
 }
 
 .stvp-speech-textarea {
     min-height: 50px;
-    font-size: 0.84em;
+    font-size: 0.85em;
     resize: vertical;
-    border-radius: var(--sp-radius-xs) !important;
-    border: 1.5px solid var(--sp-border) !important;
-    transition: border-color var(--sp-transition) !important;
 }
 
-.stvp-speech-textarea:focus {
-    border-color: var(--sp-primary) !important;
-    box-shadow: 0 0 0 3px rgba(124, 155, 255, 0.08) !important;
-}
-
-
-/* ===== 버튼 & 입력창 통합 스타일링 ===== */
-
-#saipet-settings .text_pole,
-#saipet-settings input[type="text"],
-#saipet-settings input[type="number"],
-#saipet-settings input[type="time"],
-#saipet-settings input[type="date"],
-#saipet-settings select,
-#saipet-settings textarea {
-    background: var(--sp-bg-input) !important;
-    color: var(--sp-text) !important;
-    border: 1.5px solid var(--sp-border) !important;
-    border-radius: var(--sp-radius-xs) !important;
-    padding: 7px 10px !important;
-    font-size: 0.88em !important;
-    transition: border-color var(--sp-transition), box-shadow var(--sp-transition) !important;
-    outline: none !important;
-}
-
-#saipet-settings .text_pole:focus,
-#saipet-settings input[type="text"]:focus,
-#saipet-settings input[type="number"]:focus,
-#saipet-settings input[type="time"]:focus,
-#saipet-settings input[type="date"]:focus,
-#saipet-settings select:focus,
-#saipet-settings textarea:focus {
-    border-color: var(--sp-primary) !important;
-    box-shadow: 0 0 0 3px #e8eeff !important;
-}
-
-#saipet-settings .text_pole::placeholder,
-#saipet-settings input::placeholder,
-#saipet-settings textarea::placeholder {
-    color: #8e93a3 !important;
-}
-
-#saipet-settings select {
-    cursor: pointer;
-    appearance: none;
-    -webkit-appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238e93a3'/%3E%3C/svg%3E") !important;
-    background-repeat: no-repeat !important;
-    background-position: right 10px center !important;
-    padding-right: 28px !important;
-}
-
-#saipet-settings textarea {
-    resize: vertical;
-    min-height: 60px;
-}
-
-#saipet-settings .menu_button {
-    background: var(--sp-bg-card) !important;
-    color: var(--sp-text) !important;
-    border: 1.5px solid var(--sp-border) !important;
-    border-radius: var(--sp-radius-xs) !important;
-    padding: 9px 7px !important;
-    font-size: 0.85em !important;
-    font-weight: 600 !important;
-    cursor: pointer !important;
-    transition: all var(--sp-transition) !important;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 5px;
-}
-
-#saipet-settings .menu_button:hover {
-    background: var(--sp-primary-light) !important;
-    border-color: var(--sp-border-hover) !important;
-    color: var(--sp-primary) !important;
-}
-
-#saipet-settings .menu_button:active {
-    transform: scale(0.97);
-}
-
-#saipet-settings .menu_button i {
-    margin-right: 0;
-}
-
-/* 알림 모드 토글 버튼 */
-.stvp-reminder-mode-btn {
-    border: 1.5px solid var(--sp-border) !important;
-    background: var(--sp-bg-card) !important;
-    color: var(--sp-text-dim) !important;
-    transition: all var(--sp-transition) !important;
-}
-
-.stvp-reminder-mode-btn.active {
-    background: var(--sp-primary-light) !important;
-    border-color: var(--sp-primary) !important;
-    color: var(--sp-primary) !important;
-    font-weight: 700 !important;
-}
-
-.stvp-reminder-mode-btn:hover:not(.active) {
-    background: #e8eeff !important;
-}
-
-
-/* ╔══════════════════════════════════════════╗
-   ║  PART 2 — 펫 컨테이너 (런타임 / ST 격리)  ║
-   ╚══════════════════════════════════════════╝ */
+/* ===== 펫 컨테이너 (ST 테마 격리) ===== */
 
 #saipet-container,
 #saipet-container-2 {
     --pet-size: 250px;
     --spc-bubble-bg: #ffffff;
-    --spc-bubble-text: #4a4f5e;
+    --spc-bubble-text: #333333;
     --spc-accent: #7c9bff;
     --bubble-bg-color: #ffffff;
 
@@ -676,6 +440,7 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     transform: scaleX(-1);
 }
 
+/* 호버 효과 */
 .st-pet-sprite:hover {
     transform: scale(1.1);
 }
@@ -695,7 +460,7 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     transform: translateX(var(--bubble-offset-x));
     padding: 10px 16px;
     background-color: var(--spc-bubble-bg, #ffffff);
-    color: var(--spc-bubble-text, #4a4f5e);
+    color: var(--spc-bubble-text, #333333);
     border-radius: 15px;
     border: none;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
@@ -727,10 +492,12 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     clip-path: polygon(0 0, 100% 0, 50% 100%);
 }
 
+/* 테두리 있는 디자인용 꼬리 외곽선 (바로 뒤에 배치) */
 .st-pet-bubble::before {
-    content: none;
+    content: none; /* 기본: 없음 (테마별로 재정의) */
 }
 
+/* 말풍선이 펫 하단에 표시될 때 */
 .st-pet-bubble.below {
     bottom: auto;
     top: calc(100% + 10px);
@@ -748,7 +515,7 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     line-height: 1.5;
 }
 
-/* ===== 컨디션 행 ===== */
+/* ===== 컨디션 행 (밥 버튼 + 게이지 + 말걸기) ===== */
 
 .st-pet-condition-row {
     display: flex;
@@ -764,6 +531,7 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     opacity: 1;
 }
 
+/* 배고픔 게이지 */
 .st-pet-hunger-bar {
     width: 50px;
     height: 6px;
@@ -780,6 +548,7 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     opacity: 0.7;
 }
 
+/* 밥주기/말걸기 버튼 (Font Awesome) */
 .st-pet-feed-btn,
 .st-pet-chat-btn {
     background: none;
@@ -808,6 +577,7 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     transform: scale(0.9);
 }
 
+/* 말걸기 입력창 (ST 테마 격리) */
 .st-pet-chat-input {
     display: flex;
     align-items: center;
@@ -822,7 +592,7 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     border: 2px solid rgba(128, 128, 128, 0.3);
     border-radius: 12px;
     background: #ffffff;
-    color: #4a4f5e;
+    color: #333333;
     font-size: 13px;
     font-family: inherit;
     outline: none;
@@ -841,10 +611,12 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     font-size: 12px;
 }
 
+/* ========================================
+   디자인 테마
+   ======================================== */
 
-/* ╔══════════════════════════════════════════╗
-   ║  PART 3 — 말풍선 디자인 테마             ║
-   ╚══════════════════════════════════════════╝ */
+/* --- 심플 (기본) --- */
+/* 베이스 스타일 그대로 사용 */
 
 /* --- 큐트 --- */
 #saipet-container[data-design="cute"] .st-pet-bubble,
@@ -857,6 +629,7 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     padding: 12px 18px;
 }
 
+/* 큐트 꼬리 외곽선 */
 #saipet-container[data-design="cute"] .st-pet-bubble::before,
 #saipet-container-2[data-design="cute"] .st-pet-bubble::before {
     content: "";
@@ -879,9 +652,10 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     clip-path: polygon(50% 0, 0 100%, 100% 100%);
 }
 
+/* 큐트 하트 장식 (대사 양쪽) */
 #saipet-container[data-design="cute"] .st-pet-bubble-text::before,
 #saipet-container-2[data-design="cute"] .st-pet-bubble-text::before {
-    content: "\2764\FE0E";
+    content: "❤︎";
     margin-right: 5px;
     font-size: 10px;
     color: var(--spc-accent, #ff8fa3);
@@ -890,7 +664,7 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
 
 #saipet-container[data-design="cute"] .st-pet-bubble-text::after,
 #saipet-container-2[data-design="cute"] .st-pet-bubble-text::after {
-    content: "\2764\FE0E";
+    content: "❤︎";
     margin-left: 5px;
     font-size: 10px;
     color: var(--spc-accent, #ff8fa3);
@@ -939,6 +713,7 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     font-family: 'Georgia', 'Times New Roman', serif;
 }
 
+/* 클래식 꼬리 외곽선 */
 #saipet-container[data-design="classic"] .st-pet-bubble::before,
 #saipet-container-2[data-design="classic"] .st-pet-bubble::before {
     content: "";
@@ -961,9 +736,10 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     clip-path: polygon(50% 0, 0 100%, 100% 100%);
 }
 
+/* 클래식 장식 (텍스트 앞뒤에 붙이기) */
 #saipet-container[data-design="classic"] .st-pet-bubble-text::before,
 #saipet-container-2[data-design="classic"] .st-pet-bubble-text::before {
-    content: "\27E1";
+    content: "⟡";
     margin-right: 5px;
     font-size: 11px;
     color: var(--spc-accent, #c9a84c);
@@ -972,7 +748,7 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
 
 #saipet-container[data-design="classic"] .st-pet-bubble-text::after,
 #saipet-container-2[data-design="classic"] .st-pet-bubble-text::after {
-    content: "\27E1";
+    content: "⟡";
     margin-left: 5px;
     font-size: 11px;
     color: var(--spc-accent, #c9a84c);
@@ -1049,6 +825,7 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     clip-path: polygon(50% 0, 0 100%, 100% 100%);
 }
 
+/* 사이버펑크 스캔라인 오버레이 (별도 요소로) */
 #saipet-container[data-design="cyberpunk"] .st-pet-bubble-text::before,
 #saipet-container-2[data-design="cyberpunk"] .st-pet-bubble-text::before {
     content: "> ";
@@ -1171,7 +948,7 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     border-color: var(--spc-accent, #ff5555);
 }
 
-/* --- 동양풍 --- */
+/* --- 동양풍 (저채도 녹색) --- */
 #saipet-container[data-design="oriental"] .st-pet-bubble,
 #saipet-container-2[data-design="oriental"] .st-pet-bubble {
     border-radius: 6px;
@@ -1180,10 +957,11 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
         0 2px 12px rgba(60, 80, 60, 0.12),
         inset 0 0 0 1px color-mix(in srgb, var(--spc-accent) 10%, transparent);
     padding: 12px 18px;
-    font-family: 'Georgia', 'Batang', serif;
+    font-family: 'Georgia', '바탕', 'Batang', serif;
     letter-spacing: 0.3px;
 }
 
+/* 동양풍 꼬리 외곽선 */
 #saipet-container[data-design="oriental"] .st-pet-bubble::before,
 #saipet-container-2[data-design="oriental"] .st-pet-bubble::before {
     content: "";
@@ -1206,9 +984,10 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     clip-path: polygon(50% 0, 0 100%, 100% 100%);
 }
 
+/* 동양풍 텍스트 장식 『 』 */
 #saipet-container[data-design="oriental"] .st-pet-bubble-text::before,
 #saipet-container-2[data-design="oriental"] .st-pet-bubble-text::before {
-    content: "\300E";
+    content: "『";
     margin-right: 3px;
     font-size: 12px;
     color: var(--spc-accent, #8ba88b);
@@ -1217,7 +996,7 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
 
 #saipet-container[data-design="oriental"] .st-pet-bubble-text::after,
 #saipet-container-2[data-design="oriental"] .st-pet-bubble-text::after {
-    content: "\300F";
+    content: "』";
     margin-left: 3px;
     font-size: 12px;
     color: var(--spc-accent, #8ba88b);
@@ -1249,7 +1028,7 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
 #saipet-container-2[data-design="oriental"] .st-pet-chat-text {
     border-radius: 6px;
     border: 1.5px solid color-mix(in srgb, var(--spc-accent) 50%, transparent);
-    font-family: 'Georgia', 'Batang', serif;
+    font-family: 'Georgia', '바탕', 'Batang', serif;
 }
 
 #saipet-container[data-design="oriental"] .st-pet-chat-text:focus,
@@ -1268,10 +1047,7 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     font-family: var(--spc-font) !important;
 }
 
-
-/* ╔══════════════════════════════════════════╗
-   ║  PART 4 — 애니메이션                     ║
-   ╚══════════════════════════════════════════╝ */
+/* ===== 애니메이션 ===== */
 
 /* 바운스 */
 @keyframes petBounce {
@@ -1317,7 +1093,7 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     75% { transform: scaleX(-1) rotate(10deg); }
 }
 
-/* 상태별 애니메이션 */
+/* 상태별 애니메이션 - 성능 최적화 */
 #saipet-container.state-thinking .st-pet-sprite,
 #saipet-container-2.state-thinking .st-pet-sprite,
 #saipet-container.state-sleeping .st-pet-sprite,
@@ -1330,7 +1106,7 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     animation: petThinking 2s ease-in-out infinite;
 }
 
-/* 드래그 중 흔들리기 */
+/* 드래그 중에는 살랑살랑 흔들리기 */
 #saipet-container.dragging .st-pet-sprite,
 #saipet-container-2.dragging .st-pet-sprite {
     animation: petDragWiggle 0.4s ease-in-out infinite !important;
@@ -1369,7 +1145,7 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     50% { transform: translateY(2px); }
 }
 
-/* 하트 파티클 */
+/* 하트 파티클 (쓰다듬기) */
 .st-pet-heart-particle {
     position: absolute;
     top: 15%;
@@ -1396,7 +1172,7 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     }
 }
 
-/* 졸기 zzZ */
+/* 졸기 zzZ 이펙트 — 머리 위치에 겹쳐서 표시 */
 .st-pet-zzz {
     position: absolute;
     top: 15%;
@@ -1450,7 +1226,8 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     }
 }
 
-/* 걷기 애니메이션 */
+/* ===== 걷기 애니메이션 ===== */
+
 #saipet-container.walking,
 #saipet-container-2.walking {
     transition: left 2.5s ease-in-out, top 2.5s ease-in-out;
@@ -1478,7 +1255,215 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     75% { transform: scaleX(-1) rotate(3deg) translateY(-2px); }
 }
 
-/* 꿈 이펙트 */
+/* ===== 모바일 대응 ===== */
+
+@media (max-width: 768px) {
+    .stvp-row > label:first-child {
+        flex: 0 0 100px;
+        font-size: 0.85em;
+    }
+    
+    .st-pet-bubble {
+        min-width: 80px;
+        padding: 8px 12px;
+    }
+}
+
+/* ===== 대화 로그 뷰어 ===== */
+
+.stvp-log-viewer {
+    max-height: 300px;
+    overflow-y: auto;
+    margin: 8px 0;
+    padding: 5px;
+    background: var(--SmartThemeBlurTintColor, rgba(255, 255, 255, 0.5));
+    border: 1px solid var(--SmartThemeBorderColor, rgba(0, 0, 0, 0.1));
+    border-radius: 6px;
+    font-size: 0.85em;
+}
+
+.stvp-log-empty {
+    text-align: center;
+    padding: 20px;
+    color: var(--SmartThemeBorderColor);
+    font-style: italic;
+}
+
+.stvp-log-entry {
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.04);
+    border-left: 3px solid var(--SmartThemeBorderColor);
+    transition: background 0.15s;
+}
+
+.stvp-log-entry:hover {
+    background: rgba(0, 0, 0, 0.06);
+}
+
+.stvp-log-entry:last-child {
+    margin-bottom: 0;
+}
+
+.stvp-log-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.stvp-log-delete-btn {
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: var(--SmartThemeBodyTextColor);
+    opacity: 0;
+    cursor: pointer;
+    padding: 2px 5px;
+    border-radius: 3px;
+    font-size: 0.8em;
+    transition: opacity 0.15s, background 0.15s;
+}
+
+.stvp-log-entry:hover .stvp-log-delete-btn {
+    opacity: 0.5;
+}
+
+.stvp-log-delete-btn:hover {
+    opacity: 1 !important;
+    background: rgba(244, 67, 54, 0.15);
+    color: #f44336;
+}
+
+.stvp-log-direct {
+    border-left-color: #66BB6A;
+}
+
+.stvp-log-interpet {
+    border-left-color: #AB47BC;
+}
+
+.stvp-log-dual {
+    border-left-color: #FFA726;
+}
+
+.stvp-log-reaction {
+    border-left-color: #42A5F5;
+}
+
+.stvp-log-time {
+    font-size: 0.75em;
+    color: var(--SmartThemeBodyTextColor);
+    opacity: 0.6;
+}
+
+.stvp-log-time i {
+    margin-right: 3px;
+}
+
+.stvp-log-badge {
+    font-size: 0.7em;
+    padding: 2px 7px;
+    border-radius: 4px;
+    white-space: nowrap;
+    font-weight: 600;
+}
+
+.stvp-log-badge i {
+    margin-right: 3px;
+}
+
+.stvp-log-badge-direct {
+    background: rgba(76, 175, 80, 0.12);
+    color: #66BB6A;
+}
+
+.stvp-log-badge-reaction {
+    background: rgba(33, 150, 243, 0.12);
+    color: #42A5F5;
+}
+
+.stvp-log-badge-interpet {
+    background: rgba(156, 39, 176, 0.12);
+    color: #AB47BC;
+}
+
+.stvp-log-badge-dual {
+    background: rgba(255, 152, 0, 0.12);
+    color: #FFA726;
+}
+
+.stvp-log-user {
+    margin-top: 4px;
+    padding-left: 6px;
+    color: var(--SmartThemeQuoteColor);
+    font-size: 0.9em;
+    line-height: 1.4;
+}
+
+.stvp-log-user i {
+    margin-right: 4px;
+    font-size: 0.85em;
+    opacity: 0.7;
+}
+
+.stvp-log-pet {
+    margin-top: 3px;
+    padding-left: 6px;
+    font-size: 0.9em;
+    line-height: 1.4;
+}
+
+.stvp-log-pet i {
+    margin-right: 4px;
+    font-size: 0.85em;
+    opacity: 0.7;
+}
+
+.stvp-log-buttons {
+    flex-wrap: wrap;
+    gap: 5px !important;
+}
+
+.stvp-log-buttons .menu_button {
+    flex: 1;
+    min-width: 80px;
+    font-size: 0.8em;
+    padding: 4px 6px;
+}
+
+/* 대화 로그 페이지네이션 */
+.stvp-log-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin: 6px 0;
+    font-size: 0.85em;
+}
+
+.stvp-log-pagination #stvp-log-page-info {
+    min-width: 50px;
+    text-align: center;
+    color: var(--SmartThemeQuoteColor);
+    font-weight: bold;
+}
+
+.stvp-log-page-btn {
+    padding: 3px 10px !important;
+    font-size: 0.85em !important;
+    min-width: auto !important;
+}
+
+.stvp-log-page-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+/* ===== 꿈 이펙트 (💭) ===== */
+
 .st-pet-dream {
     position: absolute;
     top: 5%;
@@ -1531,293 +1516,33 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     }
 }
 
-/* 모바일 대응 */
-@media (max-width: 768px) {
-    .stvp-row > label:first-child {
-        flex: 0 0 100px;
-        font-size: 0.85em;
-    }
-
-    .st-pet-bubble {
-        min-width: 80px;
-        padding: 8px 12px;
-    }
-}
-
-
-/* ╔══════════════════════════════════════════╗
-   ║  PART 5 — 대화 로그 뷰어                 ║
-   ╚══════════════════════════════════════════╝ */
-
-.stvp-log-viewer {
-    max-height: 600px;
-    overflow-y: auto;
-    margin: 8px 0;
-    padding: 8px;
-    background: var(--sp-bg-sub, #f5f7fc);
-    border: 1.5px solid var(--sp-border, #d8dce6);
-    border-radius: var(--sp-radius-sm, 10px);
-    font-size: 0.85em;
-}
-
-.stvp-log-empty {
-    text-align: center;
-    padding: 24px;
-    color: #8e93a3;
-    font-style: italic;
-    font-size: 0.9em;
-}
-
-.stvp-log-empty i {
-    display: block;
-    font-size: 1.5em;
-    margin-bottom: 6px;
-    opacity: 0.4;
-}
-
-.stvp-log-entry {
-    padding: 12px 14px;
-    margin-bottom: 10px;
-    border-radius: var(--sp-radius-sm, 10px);
-    background: #ffffff;
-    border-left: 3.5px solid #d8dce6;
-    border-bottom: 1px solid #d8dce6;
-    transition: background 0.2s, transform 0.2s;
-}
-
-.stvp-log-entry:hover {
-    background: #f5f7fc;
-    transform: translateX(2px);
-}
-
-.stvp-log-entry:last-child {
-    margin-bottom: 0;
-}
-
-.stvp-log-header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 5px;
-}
-
-.stvp-log-delete-btn {
-    background: none;
-    border: none;
-    color: var(--sp-text-dim);
-    opacity: 0;
-    cursor: pointer;
-    padding: 2px 6px;
-    border-radius: 5px;
-    font-size: 0.8em;
-    transition: opacity 0.15s, background 0.15s;
-}
-
-.stvp-log-replay-btn {
-    margin-left: auto;
-    background: none;
-    border: none;
-    color: var(--sp-text-dim);
-    opacity: 0;
-    cursor: pointer;
-    padding: 2px 6px;
-    border-radius: 5px;
-    font-size: 0.8em;
-    transition: opacity 0.15s, background 0.15s;
-}
-
-.stvp-log-entry:hover .stvp-log-replay-btn {
-    opacity: 0.45;
-}
-
-.stvp-log-replay-btn:hover {
-    opacity: 1 !important;
-    background: #e8f0fe;
-    color: #5b8cff;
-}
-
-.stvp-log-entry:hover .stvp-log-delete-btn {
-    opacity: 0.45;
-}
-
-.stvp-log-delete-btn:hover {
-    opacity: 1 !important;
-    background: #fde8e8;
-    color: #e07070;
-}
-
-.stvp-log-direct { border-left-color: #7cc4b8; }
-.stvp-log-interpet { border-left-color: #a8a0d4; }
-.stvp-log-dual { border-left-color: #e8a0b8; }
-.stvp-log-reaction { border-left-color: #7c9bff; }
-.stvp-log-notification { border-left-color: #d4a017; }
-
-
-
-.stvp-log-time {
-    font-size: 0.75em;
-    color: var(--sp-text-dim);
-    opacity: 0.6;
-}
-
-.stvp-log-time i {
-    margin-right: 3px;
-}
-
-.stvp-log-badge {
-    font-size: 0.7em;
-    padding: 2px 8px;
-    border-radius: 20px;
-    white-space: nowrap;
-    font-weight: 600;
-}
-
-.stvp-log-badge i {
-    margin-right: 3px;
-}
-
-.stvp-log-badge-direct {
-    background: #eef8f6;
-    color: #7cc4b8;
-}
-
-.stvp-log-badge-reaction {
-    background: #e8eeff;
-    color: #7c9bff;
-}
-
-.stvp-log-badge-interpet {
-    background: #f0eef8;
-    color: #a8a0d4;
-}
-
-.stvp-log-badge-dual {
-    background: #fdf0f4;
-    color: #e8a0b8;
-}
-
-.stvp-log-badge-notification {
-    background: #fff8e6;
-    color: #d4a017;
-}
-
-.stvp-log-notif-message {
-    margin-top: 6px;
-    padding: 6px 10px;
-    background: #fff8e6;
-    border-radius: 6px;
-    color: #8a7030;
-    font-size: 0.88em;
-    line-height: 1.5;
-}
-
-.stvp-log-notif-message i {
-    margin-right: 5px;
-    font-size: 0.82em;
-    color: #d4a017;
-}
-
-.stvp-log-user {
-    margin-top: 6px;
-    padding: 6px 10px;
-    background: #e8eeff;
-    border-radius: 6px;
-    color: #4a4f5e;
-    font-size: 0.88em;
-    line-height: 1.5;
-}
-
-.stvp-log-user i {
-    margin-right: 5px;
-    font-size: 0.82em;
-    color: #7c9bff;
-}
-
-.stvp-log-pet {
-    margin-top: 4px;
-    padding: 6px 10px;
-    background: #fdf0f4;
-    border-radius: 6px;
-    color: #4a4f5e;
-    font-size: 0.88em;
-    line-height: 1.5;
-    font-weight: 500;
-}
-
-.stvp-log-pet i {
-    margin-right: 5px;
-    font-size: 0.82em;
-    color: #e8a0b8;
-}
-
-/* 대화 로그 페이지네이션 */
-.stvp-log-pagination {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    margin: 8px 0;
-    font-size: 0.85em;
-}
-
-.stvp-log-pagination #stvp-log-page-info {
-    min-width: 50px;
-    text-align: center;
-    color: var(--sp-text-accent);
-    font-weight: 700;
-}
-
-.stvp-log-page-btn {
-    padding: 4px 12px !important;
-    font-size: 0.85em !important;
-    min-width: auto !important;
-    border-radius: var(--sp-radius-xs) !important;
-}
-
-.stvp-log-page-btn:disabled {
-    opacity: 0.35;
-    cursor: not-allowed;
-    pointer-events: none;
-}
-
-
-/* ╔══════════════════════════════════════════╗
-   ║  PART 6 — 일기장 뷰어 & 팝업             ║
-   ╚══════════════════════════════════════════╝ */
+/* ===== 일기장 뷰어 ===== */
 
 .stvp-journal-viewer {
-    max-height: 600px;
+    max-height: 350px;
     overflow-y: auto;
     margin: 8px 0;
-    padding: 8px;
-    background: #f5f7fc;
-    border: 1.5px solid #d8dce6;
-    border-radius: var(--sp-radius-sm, 10px);
+    padding: 5px;
+    background: var(--SmartThemeBlurTintColor, rgba(255, 255, 255, 0.5));
+    border: 1px solid var(--SmartThemeBorderColor, rgba(0, 0, 0, 0.1));
+    border-radius: 6px;
     font-size: 0.85em;
 }
 
 .stvp-journal-empty {
     text-align: center;
-    padding: 30px;
-    color: var(--sp-text-dim, #999);
+    padding: 25px;
+    color: var(--SmartThemeBorderColor);
     font-style: italic;
 }
 
-.stvp-journal-empty i {
-    display: block;
-    font-size: 1.5em;
-    margin-bottom: 6px;
-    opacity: 0.35;
-}
-
 .stvp-journal-card {
-    padding: 14px 16px;
-    margin-bottom: 12px;
-    border-radius: var(--sp-radius-sm, 10px);
-    background: #ffffff;
-    border-left: 3.5px solid #d8dce6;
-    border-bottom: 1px solid #d8dce6;
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.03);
+    border-left: 3px solid var(--SmartThemeBorderColor);
+    transition: transform 0.15s, box-shadow 0.15s;
 }
 
 .stvp-journal-card:last-child {
@@ -1826,49 +1551,49 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
 
 .stvp-journal-card:hover {
     transform: translateX(2px);
-    box-shadow: 0 2px 10px rgba(100, 120, 180, 0.12);
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.06);
 }
 
 .stvp-journal-card-dream {
-    border-left-color: #a8a0d4;
-    background: #f0eef8;
+    border-left-color: #7E57C2;
+    background: rgba(126, 87, 194, 0.04);
 }
 
 .stvp-journal-card-diary {
-    border-left-color: #e8a0b8;
-    background: #fdf0f4;
+    border-left-color: #FFA726;
+    background: rgba(255, 167, 38, 0.04);
 }
 
 .stvp-journal-card-header {
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-bottom: 7px;
+    margin-bottom: 6px;
     flex-wrap: wrap;
 }
 
 .stvp-journal-card-type {
-    font-size: 0.78em;
+    font-size: 0.8em;
     font-weight: 700;
-    padding: 2px 9px;
-    border-radius: 20px;
+    padding: 2px 7px;
+    border-radius: 4px;
     white-space: nowrap;
 }
 
 .stvp-journal-card-dream .stvp-journal-card-type {
-    background: #f0eef8;
-    color: #a8a0d4;
+    background: rgba(126, 87, 194, 0.12);
+    color: #7E57C2;
 }
 
 .stvp-journal-card-diary .stvp-journal-card-type {
-    background: #fdf0f4;
-    color: #e8a0b8;
+    background: rgba(255, 167, 38, 0.12);
+    color: #FFA726;
 }
 
 .stvp-journal-card-pet {
     font-size: 0.75em;
-    color: var(--sp-text-dim);
-    opacity: 0.75;
+    color: var(--SmartThemeBodyTextColor);
+    opacity: 0.7;
 }
 
 .stvp-journal-card-pet i {
@@ -1877,7 +1602,7 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
 
 .stvp-journal-card-date {
     font-size: 0.7em;
-    color: var(--sp-text-dim);
+    color: var(--SmartThemeBodyTextColor);
     opacity: 0.5;
     margin-left: auto;
 }
@@ -1889,34 +1614,33 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
 .stvp-journal-delete-btn {
     background: none;
     border: none;
-    color: var(--sp-text-dim);
+    color: var(--SmartThemeBodyTextColor);
     opacity: 0;
     cursor: pointer;
-    padding: 2px 6px;
-    border-radius: 5px;
+    padding: 2px 5px;
+    border-radius: 3px;
     font-size: 0.8em;
     transition: opacity 0.15s, background 0.15s;
 }
 
 .stvp-journal-card:hover .stvp-journal-delete-btn {
-    opacity: 0.45;
+    opacity: 0.5;
 }
 
 .stvp-journal-delete-btn:hover {
     opacity: 1 !important;
-    background: #fde8e8;
-    color: #e07070;
+    background: rgba(244, 67, 54, 0.15);
+    color: #f44336;
 }
 
 .stvp-journal-sleeptalk {
     font-size: 0.8em;
-    color: #a8a0d4;
+    color: #7E57C2;
     font-style: italic;
-    padding: 6px 12px;
-    margin-bottom: 7px;
-    background: #f0eef8;
-    border-radius: 7px;
-    border-left: 2px solid #a8a0d4;
+    padding: 4px 10px;
+    margin-bottom: 6px;
+    background: rgba(126, 87, 194, 0.06);
+    border-radius: 6px;
 }
 
 .stvp-journal-sleeptalk i {
@@ -1925,14 +1649,10 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
 }
 
 .stvp-journal-card-content {
-    line-height: 1.7;
+    line-height: 1.55;
     white-space: pre-wrap;
     word-break: break-word;
     font-size: 0.92em;
-    color: #3a3f50;
-    padding: 6px 0 2px 0;
-    border-top: 1px solid #d8dce6;
-    margin-top: 6px;
 }
 
 /* 일기장 페이지네이션 */
@@ -1940,27 +1660,26 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 12px;
-    margin: 8px 0;
+    gap: 10px;
+    margin: 6px 0;
     font-size: 0.85em;
 }
 
 .stvp-journal-pagination #stvp-journal-page-info {
     min-width: 50px;
     text-align: center;
-    color: var(--sp-text-accent);
-    font-weight: 700;
+    color: var(--SmartThemeQuoteColor);
+    font-weight: bold;
 }
 
 .stvp-journal-page-btn {
-    padding: 4px 12px !important;
+    padding: 3px 10px !important;
     font-size: 0.85em !important;
     min-width: auto !important;
-    border-radius: 7px !important;
 }
 
 .stvp-journal-page-btn:disabled {
-    opacity: 0.35;
+    opacity: 0.4;
     cursor: not-allowed;
     pointer-events: none;
 }
@@ -1973,15 +1692,16 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     left: 0;
     width: 100vw;
     height: 100vh;
-    background: rgba(20, 20, 35, 0.55);
+    background: rgba(0, 0, 0, 0.55);
     z-index: 100000;
     display: flex;
     align-items: center;
     justify-content: center;
-    animation: spPopupOverlayIn 0.25s ease;
+    backdrop-filter: blur(3px);
+    animation: stvpPopupFadeIn 0.2s ease;
 }
 
-@keyframes spPopupOverlayIn {
+@keyframes stvpPopupFadeIn {
     from { opacity: 0; }
     to { opacity: 1; }
 }
@@ -1990,20 +1710,18 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     width: 520px;
     max-width: 92vw;
     max-height: 85vh;
-    background: #ffffff;
-    border: 1.5px solid #d8dce6;
-    border-radius: 20px;
-    box-shadow:
-        0 16px 48px rgba(60, 60, 100, 0.18),
-        0 4px 16px rgba(0, 0, 0, 0.08);
+    background: var(--SmartThemeBlurTintColor, #faf6f0);
+    border: 1px solid var(--SmartThemeBorderColor, rgba(160, 130, 100, 0.35));
+    border-radius: 16px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.08) inset;
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    animation: spPopupSlideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    animation: stvpPopupSlideIn 0.25s ease;
 }
 
-@keyframes spPopupSlideIn {
-    from { transform: translateY(24px) scale(0.96); opacity: 0; }
+@keyframes stvpPopupSlideIn {
+    from { transform: translateY(20px) scale(0.97); opacity: 0; }
     to { transform: translateY(0) scale(1); opacity: 1; }
 }
 
@@ -2011,78 +1729,79 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 16px 20px;
-    border-bottom: 1.5px solid #d8dce6;
-    background: #f5f7fc;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--SmartThemeBorderColor, rgba(0, 0, 0, 0.1));
+    background: rgba(0, 0, 0, 0.03);
 }
 
 .stvp-journal-popup-title {
     font-size: 1.05em;
     font-weight: 700;
-    color: #3a3f50;
+    color: var(--SmartThemeBodyTextColor);
 }
 
 .stvp-journal-popup-title i {
-    margin-right: 8px;
-    color: #7c9bff;
-    opacity: 0.8;
+    margin-right: 6px;
+    opacity: 0.7;
 }
 
 .stvp-journal-popup-close {
     background: none;
     border: none;
-    font-size: 1em;
+    font-size: 1.1em;
     cursor: pointer;
-    color: #8e93a3;
-    width: 32px;
-    height: 32px;
+    color: var(--SmartThemeBodyTextColor);
+    opacity: 0.5;
+    width: 30px;
+    height: 30px;
     display: flex;
     align-items: center;
     justify-content: center;
     border-radius: 50%;
-    transition: all 0.2s ease;
+    transition: all 0.15s;
 }
 
 .stvp-journal-popup-close:hover {
-    background: #fde8e8;
-    color: #e07070;
-    transform: rotate(90deg);
+    opacity: 1;
+    background: rgba(244, 67, 54, 0.12);
+    color: #f44336;
 }
 
-/* 팝업 탭 */
+/* 팝업 내부 탭 */
 .stvp-journal-popup-tabs {
     display: flex;
     gap: 0;
-    border-bottom: 1.5px solid #d8dce6;
-    background: #f5f7fc;
+    border-bottom: 1px solid var(--SmartThemeBorderColor, rgba(0, 0, 0, 0.1));
+    background: rgba(0, 0, 0, 0.02);
 }
 
 .stvp-jpopup-tab {
     flex: 1;
-    padding: 11px 8px;
+    padding: 10px 8px;
     border: none;
     background: none;
-    font-size: 0.86em;
+    font-size: 0.88em;
     font-weight: 600;
     cursor: pointer;
-    color: #8e93a3;
-    transition: all 0.2s ease;
-    border-bottom: 2.5px solid transparent;
+    color: var(--SmartThemeBodyTextColor);
+    opacity: 0.5;
+    transition: all 0.15s;
+    border-bottom: 2px solid transparent;
 }
 
 .stvp-jpopup-tab:hover {
-    color: #4a4f5e;
-    background: #e8eeff;
+    opacity: 0.8;
+    background: rgba(0, 0, 0, 0.03);
 }
 
 .stvp-jpopup-tab.active {
-    color: #7c9bff;
-    border-bottom-color: #7c9bff;
-    font-weight: 700;
+    opacity: 1;
+    border-bottom-color: var(--SmartThemeQuoteColor, #6fa8dc);
+    color: var(--SmartThemeQuoteColor, #6fa8dc);
 }
 
 .stvp-jpopup-tab i {
-    margin-right: 5px;
+    margin-right: 4px;
 }
 
 /* 필터 바 */
@@ -2090,22 +1809,22 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 12px 18px;
-    border-bottom: 1px solid #d8dce6;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--SmartThemeBorderColor, rgba(0, 0, 0, 0.06));
 }
 
 .stvp-jpopup-filter-select {
     flex: 1;
     font-size: 0.85em !important;
-    padding: 6px 10px !important;
-    border-radius: 7px !important;
+    padding: 5px 8px !important;
+    border-radius: 8px !important;
 }
 
 .stvp-jpopup-action-btn {
     white-space: nowrap;
     font-size: 0.82em !important;
-    padding: 6px 14px !important;
-    border-radius: 7px !important;
+    padding: 5px 12px !important;
+    border-radius: 8px !important;
 }
 
 /* 팝업 내 뷰어 */
@@ -2115,7 +1834,7 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     margin: 0;
     border: none;
     border-radius: 0;
-    padding: 14px 18px;
+    padding: 12px 16px;
     overflow-y: auto;
     min-height: 200px;
     max-height: 45vh;
@@ -2123,92 +1842,50 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
 
 /* 팝업 내 페이지네이션 */
 .stvp-journal-popup .stvp-journal-pagination {
-    padding: 10px 18px;
-    border-top: 1px solid #d8dce6;
+    padding: 8px 16px;
+    border-top: 1px solid var(--SmartThemeBorderColor, rgba(0, 0, 0, 0.06));
 }
 
-/* 팝업 하단 */
+/* 하단 관리 바 */
 .stvp-journal-popup-footer {
     display: flex;
     gap: 8px;
-    padding: 12px 18px;
-    border-top: 1.5px solid #d8dce6;
-    background: #f5f7fc;
+    padding: 10px 16px;
+    border-top: 1px solid var(--SmartThemeBorderColor, rgba(0, 0, 0, 0.1));
+    background: rgba(0, 0, 0, 0.02);
 }
 
 .stvp-jpopup-footer-btn {
     flex: 1;
-    background: #ffffff !important;
-    color: #3a3f50 !important;
-    border: 1.5px solid #d8dce6 !important;
-    font-weight: 600 !important;
-    cursor: pointer !important;
-    transition: all 0.2s !important;
-}
-
-.stvp-jpopup-footer-btn:hover {
-    background: #e8eeff !important;
-    border-color: #b0b8cc !important;
-    color: #7c9bff !important;
-}
-
-.stvp-jpopup-action-btn {
-    background: #ffffff !important;
-    color: #3a3f50 !important;
-    border: 1.5px solid #d8dce6 !important;
-    font-weight: 600 !important;
-    cursor: pointer !important;
-    transition: all 0.2s !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    gap: 6px !important;
-}
-
-.stvp-jpopup-action-btn:hover {
-    background: #e8eeff !important;
-    border-color: #b0b8cc !important;
-    color: #7c9bff !important;
-}
-
-.stvp-jpopup-filter-select {
-    background: #ffffff !important;
-    color: #3a3f50 !important;
-    border: 1.5px solid #d8dce6 !important;
-}
-
-.stvp-jpopup-filter-select:focus {
-    border-color: #7c9bff !important;
-    box-shadow: 0 0 0 3px #e8eeff !important;
+    font-size: 0.82em !important;
+    padding: 5px 10px !important;
+    border-radius: 8px !important;
 }
 
 .stvp-jpopup-danger-btn {
-    background: #fde8e8 !important;
-    border-color: #e07070 !important;
-    color: #e07070 !important;
+    background: rgba(255, 80, 80, 0.1) !important;
+    border-color: rgba(255, 80, 80, 0.25) !important;
 }
 
 .stvp-jpopup-danger-btn:hover {
-    background: #fad0d0 !important;
+    background: rgba(255, 80, 80, 0.2) !important;
 }
 
-
-/* ╔══════════════════════════════════════════╗
-   ║  PART 7 — 알림/리마인드                  ║
-   ╚══════════════════════════════════════════╝ */
+/* ===== 알림/리마인드 ===== */
 
 .stvp-reminder-list {
     max-height: 220px;
     overflow-y: auto;
-    border: 1.5px solid #d8dce6;
-    border-radius: var(--sp-radius-sm, 10px);
-    background: #f5f7fc;
-    padding: 5px;
+    border: 1px solid var(--SmartThemeBorderColor, rgba(0, 0, 0, 0.1));
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.02);
+    padding: 4px;
 }
 
 .stvp-reminder-empty {
     text-align: center;
-    padding: 18px 8px;
-    color: var(--sp-text-dim, #999);
+    padding: 16px 8px;
+    color: var(--SmartThemeBorderColor);
     font-size: 0.82em;
     font-style: italic;
 }
@@ -2218,11 +1895,11 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    padding: 8px 12px;
-    border-radius: var(--sp-radius-xs, 7px);
-    margin-bottom: 4px;
-    background: #ffffff;
-    transition: background 0.2s, transform 0.2s;
+    padding: 7px 10px;
+    border-radius: 6px;
+    margin-bottom: 3px;
+    background: rgba(0, 0, 0, 0.03);
+    transition: opacity 0.15s, background 0.15s;
 }
 
 .stvp-reminder-item:last-child {
@@ -2230,12 +1907,11 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
 }
 
 .stvp-reminder-item:hover {
-    background: #f5f7fc;
-    transform: translateX(1px);
+    background: rgba(0, 0, 0, 0.06);
 }
 
 .stvp-reminder-item.stvp-reminder-disabled {
-    opacity: 0.4;
+    opacity: 0.45;
 }
 
 .stvp-reminder-item-left {
@@ -2251,14 +1927,14 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
     font-size: 0.9em;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
-    color: var(--sp-primary, #7c9bff);
+    color: var(--SmartThemeQuoteColor, #6fa8dc);
     white-space: nowrap;
     min-width: 42px;
 }
 
 .stvp-reminder-item-msg {
     font-size: 0.82em;
-    color: var(--sp-text, #555);
+    color: var(--SmartThemeBodyTextColor);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -2268,10 +1944,10 @@ input[type="checkbox"]:checked + .stvp-toggle::after {
 .stvp-reminder-item-repeat {
     font-size: 0.7em;
     font-weight: 600;
-    padding: 2px 7px;
-    border-radius: 20px;
-    background: #e8eeff;
-    color: #7c9bff;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: rgba(var(--SmartThemeBodyColorRgb, 0,0,0), 0.06);
+    color: var(--SmartThemeQuoteColor, #6fa8dc);
     white-space: nowrap;
 }
 
@@ -2306,39 +1982,39 @@ input:checked + .stvp-toggle-sm::after {
 .stvp-reminder-delete {
     background: none;
     border: none;
-    color: var(--sp-text-dim, #999);
+    color: var(--SmartThemeBodyTextColor);
     opacity: 0.3;
     cursor: pointer;
-    padding: 2px 5px;
-    border-radius: 5px;
+    padding: 2px 4px;
+    border-radius: 4px;
     font-size: 0.8em;
     transition: all 0.15s;
 }
 
 .stvp-reminder-delete:hover {
     opacity: 1;
-    background: #fde8e8;
-    color: #e07070;
+    background: rgba(244, 67, 54, 0.12);
+    color: #f44336;
 }
 
 .stvp-reminder-add-form,
 .stvp-reminder-form {
-    padding: 12px;
-    margin-top: 8px;
-    border: 1.5px dashed #d8dce6;
-    border-radius: var(--sp-radius-sm, 10px);
-    background: #f5f7fc;
+    padding: 8px;
+    margin-top: 6px;
+    border: 1px dashed var(--SmartThemeBorderColor, rgba(0, 0, 0, 0.15));
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.02);
 }
 
 .stvp-reminder-time-input {
-    width: 130px !important;
-    min-width: 130px;
+    width: 100px !important;
+    min-width: 100px;
     flex-shrink: 0;
     text-align: center;
     font-variant-numeric: tabular-nums;
 }
 
-/* 요일 선택 */
+/* 요일 선택 버튼 */
 .stvp-reminder-days {
     display: flex;
     flex-direction: column;
@@ -2347,24 +2023,24 @@ input:checked + .stvp-toggle-sm::after {
 
 .stvp-reminder-days-label {
     font-size: 11px;
-    color: var(--sp-text-dim, #888);
+    color: var(--SmartThemeBodyColor, #888);
     opacity: 0.7;
     flex-shrink: 0;
 }
 
 .stvp-day-buttons {
     display: flex;
-    gap: 4px;
+    gap: 3px;
     flex-wrap: wrap;
 }
 
 .stvp-day-btn {
     width: 28px;
     height: 28px;
-    border: 1.5px solid #d8dce6;
-    border-radius: var(--sp-radius-xs, 7px);
-    background: #ffffff;
-    color: #8e93a3;
+    border: 1px solid var(--SmartThemeBorderColor, rgba(0, 0, 0, 0.15));
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.03);
+    color: var(--SmartThemeBodyColor, #666);
     font-size: 11px;
     cursor: pointer;
     display: flex;
@@ -2375,15 +2051,14 @@ input:checked + .stvp-toggle-sm::after {
 }
 
 .stvp-day-btn:hover {
-    background: #e8eeff;
-    border-color: #b0b8cc;
+    background: rgba(100, 149, 237, 0.15);
 }
 
 .stvp-day-btn.active {
-    background: #e8eeff;
-    border-color: #7c9bff;
-    color: #7c9bff;
-    font-weight: 700;
+    background: rgba(100, 149, 237, 0.3);
+    border-color: rgba(100, 149, 237, 0.5);
+    color: var(--SmartThemeBodyColor, #333);
+    font-weight: 600;
 }
 
 /* 프리셋 버튼 (매일/평일/주말/1회만) */
@@ -2394,20 +2069,19 @@ input:checked + .stvp-toggle-sm::after {
 }
 
 .stvp-day-preset {
-    padding: 3px 9px;
-    border: 1.5px solid #d8dce6;
-    border-radius: 20px;
-    background: #ffffff;
-    color: #8e93a3;
+    padding: 2px 8px;
+    border: 1px solid var(--SmartThemeBorderColor, rgba(0, 0, 0, 0.12));
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.02);
+    color: var(--SmartThemeBodyColor, #888);
     font-size: 10px;
     cursor: pointer;
     transition: all 0.15s ease;
 }
 
 .stvp-day-preset:hover {
-    background: #e8eeff;
-    border-color: #b0b8cc;
-    color: #7c9bff;
+    background: rgba(100, 149, 237, 0.12);
+    border-color: rgba(100, 149, 237, 0.3);
 }
 
 /* 알림 수정 버튼 */
@@ -2415,18 +2089,18 @@ input:checked + .stvp-toggle-sm::after {
     background: none;
     border: none;
     cursor: pointer;
-    color: var(--sp-text-dim, #999);
+    color: var(--SmartThemeBodyColor, #999);
     opacity: 0.5;
     font-size: 11px;
-    padding: 2px 5px;
-    border-radius: 5px;
+    padding: 2px 4px;
+    border-radius: 4px;
     transition: all 0.15s ease;
 }
 
 .stvp-reminder-edit:hover {
     opacity: 1;
-    background: #e8eeff;
-    color: #7c9bff;
+    background: rgba(100, 149, 237, 0.12);
+    color: cornflowerblue;
 }
 
 /* 알림 확인/취소 버튼 행 */
@@ -2439,48 +2113,39 @@ input:checked + .stvp-toggle-sm::after {
 /* 자동 일기 섹션 */
 .stvp-auto-diary-section {
     margin-top: 8px;
-    padding: 10px;
-    border: 1.5px dashed #d8dce6;
-    border-radius: var(--sp-radius-sm, 10px);
-    background: #f5f7fc;
+    padding: 8px;
+    border: 1px dashed var(--SmartThemeBorderColor, rgba(0, 0, 0, 0.1));
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.02);
 }
 
-
-/* ╔══════════════════════════════════════════╗
-   ║  PART 8 — 개인 메모                      ║
-   ╚══════════════════════════════════════════╝ */
-
+/* 개인 메모 태그 시스템 */
 .stvp-memo-section {
-    margin-top: 10px;
+    margin-top: 8px;
 }
 
 .stvp-memo-list {
     max-height: 200px;
     overflow-y: auto;
-    margin: 8px 0;
+    margin: 6px 0;
 }
 
 .stvp-memo-item {
     display: flex;
     align-items: center;
-    gap: 7px;
-    padding: 5px 8px;
-    margin-bottom: 4px;
-    border-radius: var(--sp-radius-xs, 7px);
-    background: #ffffff;
+    gap: 6px;
+    padding: 4px 6px;
+    margin-bottom: 3px;
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.04);
     font-size: 12px;
-    transition: background 0.2s;
-}
-
-.stvp-memo-item:hover {
-    background: #f5f7fc;
 }
 
 .stvp-memo-tag {
     flex-shrink: 0;
-    padding: 2px 9px;
-    border-radius: 20px;
-    background: var(--sp-primary, #7c9bff);
+    padding: 1px 8px;
+    border-radius: 10px;
+    background: var(--SmartThemeQuoteColor, #6b8dd6);
     color: #fff;
     font-size: 11px;
     font-weight: 600;
@@ -2493,105 +2158,43 @@ input:checked + .stvp-toggle-sm::after {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    color: var(--sp-text, #555);
+    color: var(--SmartThemeBodyColor, #ccc);
 }
 
 .stvp-memo-date {
     flex-shrink: 0;
     font-size: 10px;
-    color: var(--sp-text-dim, #999);
+    color: #999;
     white-space: nowrap;
 }
 
 .stvp-memo-delete-btn {
     flex-shrink: 0;
-    padding: 0 5px !important;
+    padding: 0 4px !important;
     min-width: unset !important;
     font-size: 11px !important;
-    opacity: 0.4;
+    opacity: 0.5;
     transition: opacity 0.15s;
-    border-radius: 5px !important;
 }
 
 .stvp-memo-delete-btn:hover {
     opacity: 1;
-    color: #e07070;
+    color: #e74c3c;
 }
 
 .stvp-memo-empty {
     text-align: center;
-    color: var(--sp-text-dim, #999);
+    color: #888;
     font-size: 11px;
-    padding: 10px 0;
-    font-style: italic;
+    padding: 8px 0;
 }
 
 .stvp-memo-add-row {
     display: flex;
-    gap: 5px;
-    align-items: center;
-    margin-top: 5px;
-}
-
-/* 메모 — 반복 요일 선택 행 */
-.stvp-memo-days-row {
-    display: flex;
     gap: 4px;
     align-items: center;
     margin-top: 4px;
-    flex-wrap: wrap;
 }
-
-.stvp-memo-days-row > span {
-    font-size: 11px;
-    color: var(--sp-text-dim, #999);
-    margin-right: 2px;
-}
-
-.stvp-memo-day-btn {
-    padding: 2px 7px !important;
-    min-width: unset !important;
-    font-size: 10px !important;
-    border-radius: 12px !important;
-    border: 1px solid var(--sp-border, #d8dce6) !important;
-    background: var(--sp-bg-card, #ffffff) !important;
-    color: var(--sp-text, #555) !important;
-    cursor: pointer;
-    transition: all 0.15s;
-    line-height: 1.4;
-}
-
-.stvp-memo-day-btn.active {
-    background: var(--sp-primary, #7c9bff) !important;
-    color: #fff !important;
-    border-color: var(--sp-primary, #7c9bff) !important;
-}
-
-/* 메모 — 만료 메모 흐리게 */
-.stvp-memo-expired {
-    opacity: 0.45;
-}
-
-.stvp-memo-expired:hover {
-    opacity: 0.7;
-}
-
-/* 메모 — 반복 요일 뱃지 */
-.stvp-memo-recur {
-    flex-shrink: 0;
-    padding: 1px 7px;
-    border-radius: 20px;
-    background: var(--sp-accent-mint, #7cc4b8);
-    color: #fff;
-    font-size: 9px;
-    font-weight: 600;
-    white-space: nowrap;
-}
-
-
-/* ╔══════════════════════════════════════════╗
-   ║  PART 9 — 유틸리티 & 기타                ║
-   ╚══════════════════════════════════════════╝ */
 
 /* 멀티펫 버튼 행 */
 .stvp-multi-action-buttons {
@@ -2601,20 +2204,17 @@ input:checked + .stvp-toggle-sm::after {
 .stvp-multi-action-buttons .menu_button {
     flex: 1;
     font-size: 0.85em;
-    padding: 6px 10px;
-    border-radius: var(--sp-radius-xs, 7px) !important;
+    padding: 5px 8px;
 }
 
-/* 위험 버튼 */
+/* 위험 버튼 (빨간 톤) */
 .stvp-danger-btn {
-    background: #fde8e8 !important;
-    border-color: #e07070 !important;
-    color: #e07070 !important;
-    transition: all 0.2s !important;
+    background: rgba(255, 80, 80, 0.1) !important;
+    border-color: rgba(255, 80, 80, 0.22) !important;
 }
 
 .stvp-danger-btn:hover {
-    background: #fad0d0 !important;
+    background: rgba(255, 80, 80, 0.2) !important;
 }
 
 /* FA 아이콘-텍스트 여백 보정 */
@@ -2623,72 +2223,13 @@ input:checked + .stvp-toggle-sm::after {
     margin-right: 3px;
 }
 
-/* ===== 섹션별 아이콘 컬러 시스템 ===== */
-
-/* 프리셋 관리 */
-.stvp-section h5 .fa-floppy-disk,
-.stvp-section h5 .fa-save { color: #7c9bff; }
-
-/* 펫 캐릭터 */
-.stvp-section h5 .fa-paw { color: #e8a0b8; }
-
-/* 외형/크기 */
-.stvp-section h5 .fa-image,
-.stvp-section h5 .fa-ruler-combined { color: #7cc4b8; }
-
-/* 말풍선 */
-.stvp-section h5 .fa-comment,
-.stvp-section h5 .fa-comments,
-.stvp-section h5 .fa-comment-dots { color: #a8a0d4; }
-
-/* 대사 */
-.stvp-section h5 .fa-message,
-.stvp-section h5 .fa-quote-left { color: #e8a0b8; }
-
-/* 공통 설정 */
-.stvp-section h5 .fa-gear,
-.stvp-section h5 .fa-cog,
-.stvp-section h5 .fa-sliders { color: #8e93a3; }
-
-/* AI 반응 */
-.stvp-section h5 .fa-robot,
-.stvp-section h5 .fa-brain { color: #7c9bff; }
-
-/* 알림 */
-.stvp-section h5 .fa-bell { color: #d4a040; }
-
-/* 꿈 & 일기 */
-.stvp-section h5 .fa-book,
-.stvp-section h5 .fa-moon { color: #a8a0d4; }
-
-/* 멀티펫 */
-.stvp-section h5 .fa-users,
-.stvp-section h5 .fa-user-group { color: #7cc4b8; }
-
-/* 걷기 */
-.stvp-section h5 .fa-person-walking,
-.stvp-section h5 .fa-shoe-prints { color: #7cc4b8; }
-
-/* 초기화 */
-.stvp-section h5 .fa-trash,
-.stvp-section h5 .fa-rotate-left { color: #e07070; }
-
-/* 로그 */
-.stvp-section h5 .fa-list,
-.stvp-section h5 .fa-clipboard-list { color: #a8a0d4; }
-
-/* 개인 메모 */
-.stvp-section h5 .fa-sticky-note,
-.stvp-section h5 .fa-note-sticky { color: #e8a0b8; }
-
 /* 테스트 버튼 컨테이너 */
 .stvp-test-buttons .menu_button {
     font-size: 0.8em !important;
-    padding: 5px 7px !important;
-    border-radius: var(--sp-radius-xs, 7px) !important;
+    padding: 5px 6px !important;
 }
 
 .stvp-test-buttons .menu_button:disabled {
-    opacity: 0.45;
+    opacity: 0.5;
     cursor: wait;
 }

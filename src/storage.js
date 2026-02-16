@@ -73,6 +73,15 @@ export function fileToBase64(file, maxSize = 200, quality = 0.8) {
             return;
         }
         
+        // GIF/WebP는 애니메이션 보존을 위해 canvas 거치지 않고 직접 반환
+        if (file.type === "image/gif" || file.type === "image/webp") {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+            return;
+        }
+        
         // 이미지면 압축
         const img = new Image();
         const reader = new FileReader();
@@ -100,9 +109,9 @@ export function fileToBase64(file, maxSize = 200, quality = 0.8) {
                 const ctx = canvas.getContext("2d");
                 ctx.drawImage(img, 0, 0, width, height);
                 
-                // GIF/WEBP는 PNG로, 나머지는 JPEG로 (용량 절약)
+                // PNG는 투명도 보존을 위해 PNG 유지, 나머지는 JPEG (용량 절약)
                 let outputFormat = "image/jpeg";
-                if (file.type === "image/gif" || file.type === "image/webp" || file.type === "image/png") {
+                if (file.type === "image/png") {
                     // 투명도가 있을 수 있으므로 PNG 유지
                     outputFormat = "image/png";
                 }
@@ -179,6 +188,7 @@ export function loadPreset(presetId) {
     state.settings.appearance = structuredClone(preset.appearance);
     const currentOwnerName = state.settings.personality.ownerName || "";
     const currentOwnerPersona = state.settings.personality.ownerPersona || "";
+    const currentPersonalMemos = state.settings.personality.personalMemos || [];
     state.settings.personality = structuredClone(preset.personality);
     // 구버전 프리셋(유저 정보 미포함)이면 현재 유저 정보 유지
     if (!('ownerName' in preset.personality)) {
@@ -186,6 +196,9 @@ export function loadPreset(presetId) {
     }
     if (!('ownerPersona' in preset.personality)) {
         state.settings.personality.ownerPersona = currentOwnerPersona;
+    }
+    if (!('personalMemos' in preset.personality)) {
+        state.settings.personality.personalMemos = currentPersonalMemos;
     }
     state.settings.customSpeeches = structuredClone(preset.customSpeeches);
     if (preset.fallbackMessages) {
@@ -280,7 +293,7 @@ export function getPresetList() {
  * @returns {Object}
  */
 function stripUserInfo(personality) {
-    const { ownerName, ownerPersona, ...petOnly } = personality;
+    const { ownerName, ownerPersona, personalMemos, ...petOnly } = personality;
     return structuredClone(petOnly);
 }
 
@@ -369,6 +382,9 @@ export async function importPreset(file) {
                 }
                 if (preset.personality && !preset.personality.ownerPersona) {
                     preset.personality.ownerPersona = state.settings.personality.ownerPersona || "";
+                }
+                if (preset.personality && !preset.personality.personalMemos) {
+                    preset.personality.personalMemos = state.settings.personality.personalMemos || [];
                 }
                 
                 // fallbackMessages가 없으면 빈 객체

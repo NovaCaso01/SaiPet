@@ -48,10 +48,8 @@ export function createPetContainer() {
     // 초기 스프라이트 설정
     updatePetSprite();
     
-    // 드래그 이벤트 설정
-    if (state.settings.position.draggable) {
-        setupDragEvents(container);
-    }
+    // 드래그 & 클릭/쓰다듬기 이벤트 설정 (draggable 여부와 무관하게 항상 등록)
+    setupDragEvents(container);
     
     // 크기 설정
     updatePetSize();
@@ -109,6 +107,12 @@ export function removePetContainer() {
     if (state.cleanupDragEvents) {
         state.cleanupDragEvents();
         state.cleanupDragEvents = null;
+    }
+
+    // 채팅 외부 클릭 핸들러 정리
+    if (state._chatOutsideClickHandler) {
+        document.removeEventListener("click", state._chatOutsideClickHandler);
+        state._chatOutsideClickHandler = null;
     }
     
     const existing = document.getElementById("saipet-container");
@@ -214,7 +218,11 @@ export function updatePetSprite() {
             const extensionPath = `${EXTENSION_BASE_PATH}${sprite}`;
             imgSrc = extensionPath;
         }
-        state.petElement.innerHTML = `<img src="${imgSrc}" alt="pet" draggable="false">`;
+        // 같은 이미지면 DOM 교체 생략 (GIF 재시작 방지 + 성능)
+        const existingImg = state.petElement.querySelector("img");
+        if (!existingImg || existingImg.src !== imgSrc) {
+            state.petElement.innerHTML = `<img src="${imgSrc}" alt="pet" draggable="false">`;
+        }
         state.petElement.classList.add("has-image");
     } else {
         // 이모지 또는 텍스트
@@ -374,24 +382,36 @@ function setupDragEvents(container) {
         }
     }
     
+    // 드래그 시작 시에만 move/end 리스너 등록 (성능 최적화)
+    function onDragStartWrapped(e) {
+        document.addEventListener("mousemove", onDragMove);
+        document.addEventListener("mouseup", onDragEndWrapped);
+        document.addEventListener("touchmove", onDragMove, { passive: false });
+        document.addEventListener("touchend", onDragEndWrapped);
+        onDragStart(e);
+    }
+    function onDragEndWrapped(e) {
+        onDragEnd(e);
+        document.removeEventListener("mousemove", onDragMove);
+        document.removeEventListener("mouseup", onDragEndWrapped);
+        document.removeEventListener("touchmove", onDragMove);
+        document.removeEventListener("touchend", onDragEndWrapped);
+    }
+    
     // PC 마우스 이벤트
-    container.addEventListener("mousedown", onDragStart);
-    document.addEventListener("mousemove", onDragMove);
-    document.addEventListener("mouseup", onDragEnd);
+    container.addEventListener("mousedown", onDragStartWrapped);
     
     // 모바일 터치 이벤트
-    container.addEventListener("touchstart", onDragStart, { passive: false });
-    document.addEventListener("touchmove", onDragMove, { passive: false });
-    document.addEventListener("touchend", onDragEnd);
+    container.addEventListener("touchstart", onDragStartWrapped, { passive: false });
     
     // 정리 함수 저장 (메모리 누수 방지)
     state.cleanupDragEvents = () => {
-        container.removeEventListener("mousedown", onDragStart);
+        container.removeEventListener("mousedown", onDragStartWrapped);
+        container.removeEventListener("touchstart", onDragStartWrapped);
         document.removeEventListener("mousemove", onDragMove);
-        document.removeEventListener("mouseup", onDragEnd);
-        container.removeEventListener("touchstart", onDragStart);
+        document.removeEventListener("mouseup", onDragEndWrapped);
         document.removeEventListener("touchmove", onDragMove);
-        document.removeEventListener("touchend", onDragEnd);
+        document.removeEventListener("touchend", onDragEndWrapped);
     };
 }
 
@@ -449,13 +469,20 @@ function toggleChatInput() {
                     textInput.value = "";
                 }
             });
-            // 외부 클릭 시 닫기
-            document.addEventListener("click", (e) => {
-                if (!container.contains(e.target) && chatInput.style.display !== "none") {
-                    chatInput.style.display = "none";
-                    textInput.value = "";
+            // 외부 클릭 시 닫기 (이전 핸들러 제거 후 등록)
+            if (state._chatOutsideClickHandler) {
+                document.removeEventListener("click", state._chatOutsideClickHandler);
+            }
+            state._chatOutsideClickHandler = (e) => {
+                const c = document.getElementById("saipet-container");
+                const ci = c?.querySelector(".st-pet-chat-input");
+                if (c && ci && !c.contains(e.target) && ci.style.display !== "none") {
+                    ci.style.display = "none";
+                    const ti = c.querySelector(".st-pet-chat-text");
+                    if (ti) ti.value = "";
                 }
-            });
+            };
+            document.addEventListener("click", state._chatOutsideClickHandler);
         }
     }
 }
@@ -709,10 +736,9 @@ function doWalkStep() {
             sp.classList.toggle("flipped", state.settings.appearance.flipHorizontal);
         }
         
-        // 위치 저장
+        // 위치 저장 (state만 업데이트, 디스크 저장은 생략 — 걷기 위치는 휘발성)
         state.settings.position.customX = clampedX;
         state.settings.position.customY = clampedY;
-        saveSettings();
         
         // 충돌 감지
         checkAndResolvePetCollision("primary");
@@ -852,6 +878,12 @@ export function removeSecondPetContainer() {
         state._cleanupSecondPetDrag = null;
     }
     
+    // 2번째 펫 외부 클릭 리스너 정리
+    if (state._chatOutsideClickHandler2) {
+        document.removeEventListener("click", state._chatOutsideClickHandler2);
+        state._chatOutsideClickHandler2 = null;
+    }
+    
     const existing = document.getElementById("saipet-container-2");
     if (existing) existing.remove();
     
@@ -878,7 +910,11 @@ export function updateSecondPetSprite() {
         if (!sprite.startsWith("data:") && !sprite.startsWith("http")) {
             imgSrc = `${EXTENSION_BASE_PATH}${sprite}`;
         }
-        state.secondPet.petElement.innerHTML = `<img src="${imgSrc}" alt="pet2" draggable="false">`;
+        // 같은 이미지면 DOM 교체 생략 (GIF 재시작 방지 + 성능)
+        const existingImg = state.secondPet.petElement.querySelector("img");
+        if (!existingImg || existingImg.src !== imgSrc) {
+            state.secondPet.petElement.innerHTML = `<img src="${imgSrc}" alt="pet2" draggable="false">`;
+        }
         state.secondPet.petElement.classList.add("has-image");
     } else {
         state.secondPet.petElement.innerHTML = sprite || "🐱";
@@ -1013,12 +1049,20 @@ function toggleSecondPetChatInput() {
                     textInput.value = "";
                 }
             });
-            document.addEventListener("click", (e) => {
-                if (!container.contains(e.target) && chatInput.style.display !== "none") {
-                    chatInput.style.display = "none";
-                    textInput.value = "";
+            // 외부 클릭 시 닫기 (이전 핸들러 제거 후 등록)
+            if (state._chatOutsideClickHandler2) {
+                document.removeEventListener("click", state._chatOutsideClickHandler2);
+            }
+            state._chatOutsideClickHandler2 = (e) => {
+                const c = document.getElementById("saipet-container-2");
+                const ci = c?.querySelector(".st-pet-chat-input");
+                if (c && ci && !c.contains(e.target) && ci.style.display !== "none") {
+                    ci.style.display = "none";
+                    const ti = c.querySelector(".st-pet-chat-text");
+                    if (ti) ti.value = "";
                 }
-            });
+            };
+            document.addEventListener("click", state._chatOutsideClickHandler2);
         }
     }
 }
@@ -1106,20 +1150,31 @@ function setupSecondPetDragEvents(container) {
         }
     }
     
-    container.addEventListener("mousedown", onDragStart);
-    document.addEventListener("mousemove", onDragMove);
-    document.addEventListener("mouseup", onDragEnd);
-    container.addEventListener("touchstart", onDragStart, { passive: false });
-    document.addEventListener("touchmove", onDragMove, { passive: false });
-    document.addEventListener("touchend", onDragEnd);
+    function onDragStartWrapped(e) {
+        document.addEventListener("mousemove", onDragMove);
+        document.addEventListener("mouseup", onDragEndWrapped);
+        document.addEventListener("touchmove", onDragMove, { passive: false });
+        document.addEventListener("touchend", onDragEndWrapped);
+        onDragStart(e);
+    }
+    function onDragEndWrapped(e) {
+        onDragEnd(e);
+        document.removeEventListener("mousemove", onDragMove);
+        document.removeEventListener("mouseup", onDragEndWrapped);
+        document.removeEventListener("touchmove", onDragMove);
+        document.removeEventListener("touchend", onDragEndWrapped);
+    }
+    
+    container.addEventListener("mousedown", onDragStartWrapped);
+    container.addEventListener("touchstart", onDragStartWrapped, { passive: false });
     
     state._cleanupSecondPetDrag = () => {
-        container.removeEventListener("mousedown", onDragStart);
+        container.removeEventListener("mousedown", onDragStartWrapped);
+        container.removeEventListener("touchstart", onDragStartWrapped);
         document.removeEventListener("mousemove", onDragMove);
-        document.removeEventListener("mouseup", onDragEnd);
-        container.removeEventListener("touchstart", onDragStart);
+        document.removeEventListener("mouseup", onDragEndWrapped);
         document.removeEventListener("touchmove", onDragMove);
-        document.removeEventListener("touchend", onDragEnd);
+        document.removeEventListener("touchend", onDragEndWrapped);
     };
 }
 
@@ -1218,7 +1273,6 @@ function doSecondPetWalkStep() {
         if (sp) sp.classList.toggle("flipped", spd?.appearance?.flipHorizontal || false);
         state.settings.multiPet.secondPetPosition.customX = clampedX;
         state.settings.multiPet.secondPetPosition.customY = clampedY;
-        saveSettings();
         checkAndResolvePetCollision("secondary");
         const we = spd?.walk?.enabled ?? state.settings.walk?.enabled;
         if (we) scheduleNextSecondPetWalk();
@@ -1279,7 +1333,6 @@ export function checkAndResolvePetCollision(movingPetId = "primary") {
         state.settings.position.customY = clampedY;
         resetWalkOrigin();
     }
-    saveSettings();
     
     import("./pet-animation.js").then(({ playBounce }) => playBounce(pushedId));
     const customCollision = pushedId === "secondary"

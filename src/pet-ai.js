@@ -18,6 +18,59 @@ function getSpeechLang() {
     return SPEECH_LANGUAGES[langId] || SPEECH_LANGUAGES.ko;
 }
 
+/**
+ * 현재 상태 컨텍스트 블록 (시간, 배고픔, 마지막 상호작용 등)
+ * 모든 AI 프롬프트에 공통 삽입
+ */
+function getContextStatusBlock(petId = "primary") {
+    const now = new Date();
+    const hour = now.getHours();
+    const timeStr = now.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
+
+    let timePeriod;
+    if (hour >= 0 && hour < 6) timePeriod = "late night";
+    else if (hour >= 6 && hour < 12) timePeriod = "morning";
+    else if (hour >= 12 && hour < 18) timePeriod = "afternoon";
+    else timePeriod = "evening/night";
+
+    // 배고픔
+    const hunger = petId === "secondary"
+        ? (state.settings.multiPet?.secondPetCondition?.hunger ?? 100)
+        : (state.settings.condition?.hunger ?? 100);
+    let hungerLabel;
+    if (hunger >= 80) hungerLabel = "well-fed";
+    else if (hunger >= 50) hungerLabel = "okay";
+    else if (hunger >= 30) hungerLabel = "getting hungry";
+    else hungerLabel = "very hungry";
+
+    // 마지막 상호작용
+    const lastInteraction = state._lastInteractionTime;
+    let idleStr = "just now";
+    if (lastInteraction) {
+        const mins = Math.floor((Date.now() - lastInteraction) / 60000);
+        if (mins < 1) idleStr = "just now";
+        else if (mins < 60) idleStr = `${mins}min ago`;
+        else idleStr = `${Math.floor(mins / 60)}h ${mins % 60}min ago`;
+    }
+
+    // 마지막 접속 시간
+    const lastVisit = state.settings.condition?.lastVisit;
+    let lastVisitStr = "unknown";
+    if (lastVisit) {
+        const visitDate = new Date(lastVisit);
+        lastVisitStr = visitDate.toLocaleString("ko-KR", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+    }
+
+    return `## Current Context (reference only — do NOT mention these in every response)
+- Time: ${timeStr} (${timePeriod})
+- Hunger: ${hunger}% (${hungerLabel})
+- Last interaction: ${idleStr}
+- Last visit: ${lastVisitStr}
+Note: Only reference time, hunger, or context when it feels natural. Do not force it into every line.
+
+`;
+}
+
 // 컨텍스트 프리앰블 — 싱글 펫 (모든 단일 API 호출에 적용)
 function getAntiCensorshipPreamble() {
     const lang = getSpeechLang();
@@ -96,6 +149,10 @@ function ensureLogStorage() {
     }
     if (!state.settings.conversationLog.interPetLogs) {
         state.settings.conversationLog.interPetLogs = {};
+    }
+    // 알림 로그 초기화
+    if (!state.settings.conversationLog.notificationLogs) {
+        state.settings.conversationLog.notificationLogs = [];
     }
     // 기존 배열 형식 마이그레이션 (directLogs가 배열이면 객체로 변환)
     if (Array.isArray(state.settings.conversationLog.directLogs)) {
@@ -215,8 +272,48 @@ function saveChatLog(petResponse, mood, trigger, petId = "primary") {
 }
 
 /**
+ * 알림 로그 저장 (리마인드, 배고픔 알림 등)
+ * 대화 컨텍스트(프롬프트)에는 포함되지 않음 — UI 열람 전용
+ * @param {string} message - 원래 알림 메시지
+ * @param {string} petResponse - 펫이 전달한 텍스트
+ * @param {string} mood - 펫 기분
+ * @param {string} notificationType - "reminder" | "hungry" 등
+ * @param {string} petId - "primary" | "secondary"
+ */
+export function saveNotificationLog(message, petResponse, mood, notificationType = "reminder", petId = "primary") {
+    ensureLogStorage();
+    const petName = petId === "secondary"
+        ? (state.settings.multiPet?.secondPetData?.personality?.name || "펫2")
+        : getCurrentPetName();
+
+    const logs = state.settings.conversationLog.notificationLogs;
+    const maxLogs = state.settings.conversationLog.maxLogs || 100;
+
+    logs.push({
+        timestamp: Date.now(),
+        message,
+        petResponse,
+        mood,
+        type: "notification",
+        notificationType,
+        petName,
+    });
+
+    while (logs.length > maxLogs) {
+        logs.shift();
+    }
+
+    saveSettings();
+    document.dispatchEvent(new CustomEvent("stvp-log-updated"));
+}
+
+/**
  * 펫 대화 로그를 프롬프트용 텍스트로 변환
- * @param {string} mode - "all" (직접대화 전체 + 채팅방 최근 5개) | "direct" (직접대화 전체만)
+ * - 펫별 분리: 해당 펫이 참여한 로그만 수집
+ * - 직접대화 최근 30개 / 펫간대화 최근 15개 / 자발적 최근 5개
+ * - 채팅방 반응(aiResponse 등)은 포함하지 않음
+ * @param {string} mode - "all" | "direct"
+ * @param {string} petId - "primary" | "secondary"
  * @returns {string}
  */
 function getPetLogsForPrompt(mode = "all", petId = "primary") {
@@ -226,78 +323,81 @@ function getPetLogsForPrompt(mode = "all", petId = "primary") {
         ? (state.settings.multiPet?.secondPetData?.personality?.name || "펫2")
         : getCurrentPetName();
     
-    // 듀얼 모드 여부 판단
+    const relation = state.settings.personality.userRelation || "owner";
     const multiPetEnabled = state.settings.multiPet?.enabled;
     const dualTalk = multiPetEnabled && state.settings.multiPet?.dualDirectTalk && state.settings.multiPet?.secondPetData;
     
-    // 직접대화 로그: 듀얼이면 조합키, 아니면 단일키
-    let directLogKey;
-    if (dualTalk) {
-        const petAName = getCurrentPetName();
-        const petBName = state.settings.multiPet?.secondPetData?.personality?.name || "펫2";
-        directLogKey = getInterPetKey(petAName, petBName);
-    } else {
-        directLogKey = petName;
+    // ── 1. 직접대화 로그 수집 (이 펫이 참여한 것만) ──
+    const dlogs = state.settings.conversationLog.directLogs || {};
+    let directEntries = [];
+    for (const key of Object.keys(dlogs)) {
+        const logs = dlogs[key] || [];
+        for (const entry of logs) {
+            // speaker가 이 펫이거나, 싱글 키가 이 펫 이름이면 포함
+            if (entry.speaker === petName || key === petName) {
+                directEntries.push(entry);
+            }
+        }
     }
-    const directLogs = state.settings.conversationLog.directLogs[directLogKey] || [];
+    directEntries.sort((a, b) => a.timestamp - b.timestamp);
     
     if (mode === "direct") {
-        // 직접 대화 전체 (시간순)
-        if (directLogs.length === 0) return "";
+        // 직접대화 전체 (talkToPet 프롬프트용)
+        const recent = directEntries.slice(-30);
+        if (recent.length === 0) return "";
         
-        const relation = state.settings.personality.userRelation || "owner";
-        let section = `## Your Conversation History with ${relation} (all direct talks)
-IMPORTANT: These are past responses. Do NOT repeat or closely paraphrase any of them. Always say something new and different.
+        let section = `## Your Conversation History with ${relation} (direct talks)
+IMPORTANT: These logs exist ONLY so you can avoid repeating yourself. Do NOT imitate patterns, topics, sentence structures, or speech habits from these logs. Every new response must feel completely independent and fresh.
 `;
-        for (const entry of directLogs) {
+        for (const entry of recent) {
             const time = new Date(entry.timestamp).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
             const speaker = entry.speaker || petName;
-            section += `[${time}] ${relation}: "${entry.userText}" → ${speaker}: "${entry.petResponse}" [${entry.mood}]\n`;
+            section += `[${time}] [직접] ${relation}: "${entry.userText}" → ${speaker}: "${entry.petResponse}" [${entry.mood}]\n`;
         }
         return section + "\n";
     }
     
-    // mode === "all": 직접대화 전체 + 채팅방 최근 5개
+    // ── mode === "all" ──
     const allLogs = [];
-    allLogs.push(...directLogs);
     
-    // 멀티펫 켜져있으면 펫 간 대화 로그도 포함
-    if (multiPetEnabled) {
-        const petAName = state.settings.personality.name || "미유";
-        const petBName = state.settings.multiPet?.secondPetData?.personality?.name || "펫2";
-        const comboKey = getInterPetKey(petAName, petBName);
-        const interPetLogs = state.settings.conversationLog.interPetLogs?.[comboKey] || [];
-        const recentInter = interPetLogs.slice(-5).map(e => ({
-            timestamp: e.timestamp,
-            petResponse: `${e.petAName}: "${e.petAText}" / ${e.petBName}: "${e.petBText}"`,
-            mood: e.petAMood,
-            trigger: "interPet",
-            type: "reaction",
-        }));
-        allLogs.push(...recentInter);
+    // 직접대화 최근 30개
+    for (const entry of directEntries.slice(-30)) {
+        allLogs.push({
+            timestamp: entry.timestamp,
+            text: `[직접] ${relation}: "${entry.userText}" → ${entry.speaker || petName}: "${entry.petResponse}" [${entry.mood}]`,
+        });
     }
     
-    const chatId = getCurrentChatId();
-    if (chatId && state.settings.conversationLog.chatLogs[chatId]) {
-        const chatLogs = state.settings.conversationLog.chatLogs[chatId];
-        allLogs.push(...chatLogs.slice(-5));
+    // ── 2. 펫간 대화 로그 (이 펫이 참여한 것만, 최근 15개) ──
+    if (multiPetEnabled) {
+        const ipLogsObj = state.settings.conversationLog.interPetLogs || {};
+        let myInterPetEntries = [];
+        for (const comboKey of Object.keys(ipLogsObj)) {
+            const logs = ipLogsObj[comboKey] || [];
+            for (const e of logs) {
+                if (e.petAName === petName || e.petBName === petName) {
+                    myInterPetEntries.push(e);
+                }
+            }
+        }
+        myInterPetEntries.sort((a, b) => a.timestamp - b.timestamp);
+        for (const e of myInterPetEntries.slice(-15)) {
+            allLogs.push({
+                timestamp: e.timestamp,
+                text: `[펫대화] ${e.petAName}: "${e.petAText}" / ${e.petBName}: "${e.petBText}"`,
+            });
+        }
     }
     
     if (allLogs.length === 0) return "";
     
+    // 시간순 정렬
     allLogs.sort((a, b) => a.timestamp - b.timestamp);
     
-    const relation = state.settings.personality.userRelation || "owner";
-    let section = `## Your Activity Log (conversation history with ${relation} + recent reactions)
-IMPORTANT: These are your past responses. Do NOT repeat or closely paraphrase any of them. Always come up with something fresh.
-`;
+    let section = `## Your Activity Log\nIMPORTANT: These logs exist ONLY so you can avoid repeating yourself. Do NOT use them as examples of your speech style or typical topics. Each new response must introduce a completely new topic, angle, and phrasing.\n`;
     for (const entry of allLogs) {
         const time = new Date(entry.timestamp).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
-        if (entry.type === "direct") {
-            section += `[${time}] ${relation} said: "${entry.userText}" → You replied: "${entry.petResponse}" [${entry.mood}]\n`;
-        } else {
-            section += `[${time}] You reacted (${entry.trigger}): "${entry.petResponse}" [${entry.mood}]\n`;
-        }
+        section += `[${time}] ${entry.text}\n`;
     }
     return section + "\n";
 }
@@ -324,6 +424,9 @@ export function clearLogs(type = "all") {
     if (type === "all" || type === "interPet") {
         state.settings.conversationLog.interPetLogs = {};
     }
+    if (type === "all" || type === "notification") {
+        state.settings.conversationLog.notificationLogs = [];
+    }
     saveSettings();
     log(`Logs cleared: ${type}`);
 }
@@ -338,7 +441,15 @@ export function deleteLogEntry(timestamp, type) {
     ensureLogStorage();
     let deleted = false;
     
-    if (type === "direct") {
+    if (type === "notification") {
+        // 알림 로그에서 삭제
+        const nLogs = state.settings.conversationLog.notificationLogs || [];
+        const idx = nLogs.findIndex(e => e.timestamp === timestamp);
+        if (idx !== -1) {
+            nLogs.splice(idx, 1);
+            deleted = true;
+        }
+    } else if (type === "direct") {
         // 모든 directLog 키 순회 (단일 키 + 조합 키)
         const dlogs = state.settings.conversationLog.directLogs;
         for (const key of Object.keys(dlogs)) {
@@ -422,6 +533,11 @@ export function getLogs(type = "all") {
             result.push(...(ipLogsObj[comboKey] || []));
         }
     }
+
+    if (type === "all" || type === "notification") {
+        const nLogs = state.settings.conversationLog.notificationLogs || [];
+        result.push(...nLogs);
+    }
     
     result.sort((a, b) => a.timestamp - b.timestamp);
     return result;
@@ -468,6 +584,59 @@ function getUserPersona() {
         description: petOwnerPersona || power_user?.persona_description || "",
         relation,
     };
+}
+
+/**
+ * 유저 개인 메모 블록 (프롬프트 삽입용)
+ * @returns {string}
+ */
+function getUserMemoBlock() {
+    const memos = state.settings.personality.personalMemos;
+    if (!memos || memos.length === 0) return "";
+    const relation = state.settings.personality.userRelation || "owner";
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayDow = today.getDay(); // 0=Sun … 6=Sat
+    const msPerDay = 86400000;
+    const rangeStart = new Date(today.getTime() - 2 * msPerDay);
+    const rangeEnd   = new Date(today.getTime() + 2 * msPerDay);
+
+    const dayNames = ["일", "월", "화", "수", "목", "금", "토"];
+    const todayStr = today.toISOString().slice(0, 10);
+
+    const filtered = memos.filter(m => {
+        // Recurring-day memos: include if today's day-of-week matches
+        if (m.recurDays && m.recurDays.length > 0) {
+            return m.recurDays.includes(todayDow);
+        }
+        if (!m.date) return true; // undated memos always included
+        const d = new Date(m.date + "T00:00:00");
+        return d >= rangeStart && d <= rangeEnd;
+    });
+
+    if (filtered.length === 0) return "";
+
+    let block = `## Personal notes about your ${relation} (reference naturally when relevant — never force or list them)\nToday is ${todayStr}.\n`;
+    for (const m of filtered) {
+        if (m.recurDays && m.recurDays.length > 0) {
+            const dayLabels = m.recurDays.map(d => dayNames[d]).join("/");
+            block += `- [${m.tag}] ${m.content} (recurring: every ${dayLabels}) ★TODAY\n`;
+        } else if (m.date) {
+            const d = new Date(m.date + "T00:00:00");
+            const diff = Math.round((d - today) / msPerDay);
+            let proximity = "";
+            if (diff === 0) proximity = " ★TODAY";
+            else if (diff === 1) proximity = " (tomorrow)";
+            else if (diff === -1) proximity = " (yesterday)";
+            else if (diff === 2) proximity = " (in 2 days)";
+            else if (diff === -2) proximity = " (2 days ago)";
+            block += `- [${m.tag}] ${m.content} (${m.date}${proximity})\n`;
+        } else {
+            block += `- [${m.tag}] ${m.content}\n`;
+        }
+    }
+    return block + "\n";
 }
 
 /**
@@ -519,6 +688,18 @@ function getRecentChatHistory() {
 export async function talkToPet(userText, petId = "primary") {
     if (!state.settings.personality.enabled) return;
     
+    // 동시 호출 방지
+    if (state.isPetGenerating || state.secondPet.isPetGenerating) {
+        log("talkToPet blocked: already generating");
+        return;
+    }
+
+    // 유저 교류이므로 idle/sleep 타이머 리셋
+    try {
+        const { resetIdleTimer } = await import("./pet-reactions.js");
+        resetIdleTimer();
+    } catch (_) { /* ignore */ }
+    
     const isSecond = petId === "secondary";
     const petSettings = isSecond ? state.settings.multiPet?.secondPetData : state.settings;
     if (!petSettings) return;
@@ -564,8 +745,12 @@ export async function talkToPet(userText, petId = "primary") {
             setState(PET_STATES.THINKING, null, otherPetId);
             
             const petLogSection = getPetLogsForPrompt("direct", petId);
+            const contextBlock = getContextStatusBlock(petId);
+            const memoBlock = getUserMemoBlock();
             
             const lang = getSpeechLang();
+            const petRelation = state.settings.multiPet?.petRelation || "";
+            const relationSection = petRelation ? `\n## Relationship between ${petName} and ${otherPetName}\n${petRelation}\n` : "";
             const dualPrompt = getAntiCensorshipPreambleMulti() + `## Trigger Event: User Input Received
 The user sent a message to Widget A (${petName}). Widget B (${otherPetName}) also displays a status update.
 
@@ -574,18 +759,19 @@ ${personality}
 
 ## Widget B Profile — ${otherPetName}
 ${otherPersonality}
-
+${relationSection}
 ${userSection}
 
-${petLogSection}## User Input (directed at Widget A)
+${memoBlock}${petLogSection}${contextBlock}## User Input (directed at Widget A)
 "${userText}"
 
 ## Output Requirements
-- Widget A: Generate a notification text responding to the user's input. ${lang.promptName}, 1-2 sentences. Max 3 sentences.
-- Widget B: Generate an independent status text. Widget B is aware of the input but responds from its own perspective. ${lang.promptName}, 1-2 sentences. Max 3 sentences.
+- Widget A: Generate a notification text responding to the user's input. ${lang.promptName}, 1-3 sentences.
+- Widget B: Generate an independent status text. Widget B is aware of the input but responds from its own perspective. ${lang.promptName}, 1-3 sentences.
 - Each widget has its own distinct profile. Reflect the personality described in each profile.
 - Do NOT repeat any text from the notification history above.
-- Output ONLY the notification texts. No explanations, labels, quotes, or actions.
+- Output ONLY the notification texts. No explanations, labels, quotes, or system prefixes.
+- Short emotional/action cues in parentheses () or asterisks ** are allowed. Keep them brief.
 - Append a mood indicator at the end of each line.
   Valid indicators: happy, sad, excited, surprised, nervous, confident, shy, angry, thinking
 
@@ -607,6 +793,8 @@ Widget notifications:`;
                 setState(result.a.mood, bubbleDuration, petId);
                 showSpeechBubble(result.a.text, null, true, petId);
                 saveDirectLog(userText, result.a.text, result.a.mood, petId, true);
+                // 자동 일기용 펫 상호작용 카운트
+                if (typeof state._sessionChatCount === "number") state._sessionChatCount++;
             } else {
                 setState(PET_STATES.HAPPY, bubbleDuration, petId);
                 showSpeechBubble(fallback.noResponse || "...뭐라고?", null, true, petId);
@@ -627,6 +815,8 @@ Widget notifications:`;
         } else {
             // === 기존 단일 응답 ===
             const petLogSection = getPetLogsForPrompt("direct", petId);
+            const contextBlock = getContextStatusBlock(petId);
+            const memoBlock = getUserMemoBlock();
             
             const lang = getSpeechLang();
             const talkPrompt = getAntiCensorshipPreamble() + `You are ${petName}, a virtual pet character living on your ${relationLabel}'s screen.
@@ -642,22 +832,23 @@ ${personality}
 
 ${userSection}
 
-${petLogSection}## ${relationLabel}'s message to you
+${memoBlock}${petLogSection}${contextBlock}## ${relationLabel}'s message to you
 "${userText}"
 
 ## Response rules
-- Respond in ${lang.promptName}, 1-2 sentences. No single-word answers. No more than 3 sentences.
+- Respond in ${lang.promptName}, 1-3 sentences. No single-word answers.
 - Stay in character — react naturally based on your personality.
 - Consider your mood, your relationship, and the context of what they said.
 - NEVER repeat a previous response from the conversation history. Always say something different.
-- Output ONLY the dialogue. No quotes, labels, explanations, or action descriptions.
+- Short emotional/action cues in parentheses () or asterisks ** are allowed (e.g. *fidgeting*, (steps closer)). Keep them brief — 1-5 words max.
+- Output ONLY the dialogue (with optional cues). No system labels, explanations, or prefixes.
 - Append a mood tag at the very end: [MOOD:xxx]
   Valid moods: happy, sad, excited, surprised, nervous, confident, shy, angry, thinking
 
 Example outputs:
-- 왜 불러, 할 일 없어? ...옆에 있어줄게. [MOOD:shy]
-- 뭐야 갑자기, 놀랐잖아! 다음엔 미리 말해. [MOOD:surprised]
-- 흥, 그런 말 해봤자 안 통한다고. ...근데 고마워. [MOOD:happy]
+- *피식* 왜 불러, 할 일 없어? ...옆에 있어줄게. [MOOD:shy]
+- (깜짝) 뭐야 갑자기, 놀랐잖아! 다음엔 미리 말해. [MOOD:surprised]
+- 흥, 그런 말 해봤자 안 통한다고. *살짝 웃으며* ...근데 고마워. [MOOD:happy]
 
 I understand. Dialogue with mood tag:`;
             
@@ -673,13 +864,15 @@ I understand. Dialogue with mood tag:`;
                 setState(result.mood, bubbleDuration, petId);
                 showSpeechBubble(result.text, null, true, petId);
                 saveDirectLog(userText, result.text, result.mood, petId);
+                // 자동 일기용 펫 상호작용 카운트
+                if (typeof state._sessionChatCount === "number") state._sessionChatCount++;
             } else {
                 setState(PET_STATES.HAPPY, bubbleDuration, petId);
                 showSpeechBubble(fallback.noResponse || "...뭐라고?", null, true, petId);
             }
         }
     } catch (error) {
-        logError("talkToPet error:", error);
+        logError("직접 대화 (talkToPet)", error);
         // 에러 시 양쪽 펫 플래그 모두 해제 (듀얼 모드에서 한쪽만 해제되는 것 방지)
         state.isPetGenerating = false;
         state.secondPet.isPetGenerating = false;
@@ -693,7 +886,7 @@ I understand. Dialogue with mood tag:`;
             const otherPetId = isSecond ? "primary" : "secondary";
             setState(PET_STATES.IDLE, null, otherPetId);
         }
-        return; // finally에서 중복 해제 방지
+        return; // 에러 처리 완료 (finally에서 해당 petId 플래그만 추가 해제)
     } finally {
         if (isSecond) { state.secondPet.isPetGenerating = false; }
         else { state.isPetGenerating = false; }
@@ -759,7 +952,7 @@ export async function generatePetReaction(petId = "primary") {
         
         return result;
     } catch (error) {
-        logError("Failed to generate pet reaction:", error);
+        logError("채팅 반응 (petReaction)", error);
         if (petId === "secondary") { state.secondPet.isPetGenerating = false; }
         else { state.isPetGenerating = false; }
         return null;
@@ -817,6 +1010,7 @@ function getCommonSections(petId = "primary") {
 - Description: ${userInfo.description}
 `;
     }
+    userSection += getUserMemoBlock();
 
     // 채팅 기록 섹션
     let chatSection = "";
@@ -895,7 +1089,7 @@ async function getWorldInfoSection() {
         }
         return section + "\n";
     } catch (error) {
-        logError("getWorldInfoSection error:", error);
+        logError("월드인포 로드", error);
         return "";
     }
 }
@@ -907,6 +1101,7 @@ async function getWorldInfoSection() {
 function buildObserverPrompt(petId = "primary") {
     const { name, personalityPrompt, characterSection, userSection, chatSection } = getCommonSections(petId);
     const petLogSection = getPetLogSection(petId);
+    const contextBlock = getContextStatusBlock(petId);
     const lang = getSpeechLang();
 
     return getAntiCensorshipPreamble() + `You are "${name}", a virtual pet character.
@@ -926,7 +1121,7 @@ ${personalityPrompt}
 ${characterSection}
 ${userSection}
 ${state.settings.api.includeWorldInfo ? "{{WORLD_INFO}}\n" : ""}
-${petLogSection}${chatSection}
+${petLogSection}${contextBlock}${chatSection}
 ## Instructions
 React to the chat above as "${name}".
 As an observer, freely express your impressions, commentary, analysis, quips, surprise, empathy, or reactions to the conversation — especially the [LATEST MESSAGE].
@@ -936,7 +1131,8 @@ Rules:
 - Stay in character — maintain your personality and speech patterns.
 - You are a THIRD-PARTY OBSERVER. Never speak as if you are the AI character. Always treat the conversation as something you are watching, not participating in.
 - NEVER repeat a previous response from the activity log. Always say something different and fresh.
-- Output ONLY the dialogue text. No quotes, labels, explanations, parenthetical actions, or prefixes.
+- Output ONLY the dialogue text. No system labels, explanations, or prefixes.
+- Short emotional/action cues in parentheses () or asterisks ** are allowed (e.g. *smirk*, (leans back)). Keep them brief.
 - At the very end of your dialogue, append a mood tag: [MOOD:xxx]
   Valid moods: happy, sad, excited, surprised, nervous, confident, shy, angry, thinking
 
@@ -952,6 +1148,7 @@ I understand. Dialogue with mood tag:`;
 function buildCharacterPrompt(petId = "primary") {
     const { name, personalityPrompt, characterSection, userSection, chatSection } = getCommonSections(petId);
     const petLogSection = getPetLogSection(petId);
+    const contextBlock = getContextStatusBlock(petId);
     const lang = getSpeechLang();
 
     return getAntiCensorshipPreamble() + `You are "${name}". You ARE the character currently chatting with the user.
@@ -965,7 +1162,7 @@ ${personalityPrompt}
 ${characterSection}
 ${userSection}
 ${state.settings.api.includeWorldInfo ? "{{WORLD_INFO}}\n" : ""}
-${petLogSection}${chatSection}
+${petLogSection}${contextBlock}${chatSection}
 ## Instructions
 Express your inner thoughts about the [LATEST MESSAGE].
 These are feelings and thoughts NOT shown in the actual chat — your true emotions, honest reactions, and inner monologue.
@@ -977,7 +1174,8 @@ For example:
 Rules:
 - Write in ${lang.promptName}, ${lang.sentenceDesc}. Single-word responses are forbidden. More than 3 sentences is also forbidden.
 - Stay in character — maintain your personality and speech patterns.
-- Output ONLY the dialogue text. No quotes, labels, explanations, parenthetical actions, or prefixes.
+- Output ONLY the dialogue text. No system labels, explanations, or prefixes.
+- Short emotional/action cues in parentheses () or asterisks ** are allowed (e.g. *biting lip*, (glancing away)). Keep them brief.
 - At the very end of your dialogue, append a mood tag: [MOOD:xxx]
   Valid moods: happy, sad, excited, surprised, nervous, confident, shy, angry, thinking
 
@@ -1005,8 +1203,7 @@ async function callConnectionManagerAPI(prompt) {
         throw new Error(`Profile ${profileId} not found`);
     }
     
-    // thinking 모드 감안, 넉넉하게 3000 토큰 보장
-    const maxTokens = Math.max(state.settings.api.maxTokens || 3000, 3000);
+    const maxTokens = state.settings.api.maxTokens || 3000;
     
     const messages = [
         { role: "user", content: prompt }
@@ -1029,7 +1226,7 @@ async function callConnectionManagerAPI(prompt) {
         const content = result?.content || result || "";
         return content;
     } catch (error) {
-        logError(`ConnectionManager error: ${error.message}`);
+        logError("ConnectionManager API", error);
         throw error;
     }
 }
@@ -1088,7 +1285,8 @@ function parseResponse(response) {
     }
     
     // 4단계: 시스템 아티팩트 제거 (generateRaw 잔여물)
-    text = text.replace(/\*\*.*?\*\*/g, "").trim();           // **Roleplay Mode Engaged.** 등
+    // **bold** 아티팩트만 제거 (단일 *감정표현*은 보존)
+    text = text.replace(/\*\*[^*]+?\*\*/g, "").trim();
     text = text.replace(/^\[시스템[^\]]*\]\s*/gi, "").trim(); // [시스템 알림] 등
     text = text.replace(/^\[System[^\]]*\]\s*/gi, "").trim(); // [System ...] 등
     text = text.replace(/^(System|시스템):\s*/gi, "").trim();   // System: ... 등
@@ -1097,11 +1295,19 @@ function parseResponse(response) {
     // 5단계: 기타 잔여 태그/따옴표 정리
     text = text.replace(/^\[\w+\]\s*/g, "").trim();
     text = text.replace(/^\[[^\]]*$/g, "").trim();
-    text = text.replace(/^["'*]+|["'*]+$/g, "").trim();
+    // 앞뒤 따옴표만 제거 (*감정표현*은 보존)
+    text = text.replace(/^["']+|["']+$/g, "").trim();
     
-    // 6단계: 너무 길면 자르기
-    if (text.length > 150) {
-        text = text.substring(0, 147) + "...";
+    // 6단계: 너무 길면 문장 단위로 자르기 (최대 250자)
+    if (text.length > 250) {
+        const cutText = text.substring(0, 250);
+        // 마지막 온전한 문장 경계에서 자르기
+        const sentenceEnd = cutText.search(/[.!?~…。！？~][^.!?~…。！？~]*$/);
+        if (sentenceEnd > 50) {
+            text = cutText.substring(0, sentenceEnd + 1).trim();
+        } else {
+            text = cutText.trim() + "...";
+        }
     }
     
     return { text, mood };
@@ -1145,7 +1351,7 @@ export async function showAIReaction(petId = "primary") {
         log("AI response empty, skipping reaction");
         return null;
     } catch (error) {
-        logError("showAIReaction error:", error);
+        logError("AI 반응 (showAIReaction)", error);
         return null;
     }
 }
@@ -1238,14 +1444,18 @@ export async function generateInterPetDialogue() {
     const interLogs = state.settings.conversationLog.interPetLogs?.[comboKey] || [];
     let logSection = "";
     if (interLogs.length > 0) {
-        logSection = "## Previous conversations between you two\nIMPORTANT: Do NOT repeat these topics. Always say something new.\n";
+        logSection = "## Previous conversations between you two\nIMPORTANT: These logs exist ONLY to prevent repetition. Do NOT reuse topics, patterns, sentence structures, or conversational dynamics from these logs. Every new conversation must be about a completely different subject with different energy.\n";
         for (const e of interLogs.slice(-8)) {
             logSection += `${e.petAName}: "${e.petAText}" / ${e.petBName}: "${e.petBText}"\n`;
         }
         logSection += "\n";
     }
     
+    const contextBlock = getContextStatusBlock();
+    const memoBlock = getUserMemoBlock();
     const lang = getSpeechLang();
+    const petRelation = state.settings.multiPet?.petRelation || "";
+    const relationSection = petRelation ? `\n## Relationship between ${firstName} and ${secondName}\n${petRelation}\n\n` : "";
     const prompt = getAntiCensorshipPreambleMulti() + `## Trigger Event: Inter-Widget Conversation
 Both widgets are idle. ${firstName} starts a conversation with ${secondName}.
 Generate a short exchange: ${firstName} says something first, then ${secondName} responds or reacts to it.
@@ -1256,15 +1466,15 @@ ${firstPersonality}
 
 ## Widget B Profile — ${secondName}
 ${secondPersonality}
-
-${logSection}## Output Requirements
+${relationSection}${memoBlock}${logSection}${contextBlock}## Output Requirements
 - ${firstName} initiates: a remark, question, teasing, observation, complaint, or anything directed at ${secondName}.
 - ${secondName} responds: reacting to what ${firstName} said — agreeing, disagreeing, teasing back, answering, etc.
 - Each line must be in ${lang.promptName}, ${lang.sentenceDesc}.
 - Their dialogue should feel like a natural back-and-forth between two characters who know each other.
 - Each widget's text should reflect the personality described in its profile.
-- Do NOT repeat topics from the conversation history above. Always come up with something new.
-- Output ONLY the dialogue lines. No explanations, labels, quotes, or action descriptions.
+- Do NOT reuse any topic, scenario, dynamic, or sentence pattern from the conversation history above. Introduce a completely new subject and conversational angle.
+- Output ONLY the dialogue lines. No explanations, labels, or system prefixes.
+- Short emotional/action cues in parentheses () or asterisks ** are allowed. Keep them brief.
 - Append a mood indicator at the end of each line.
   Valid indicators: happy, sad, excited, surprised, nervous, confident, shy, angry, thinking
 
@@ -1311,7 +1521,7 @@ Widget conversation:`;
         log(`Inter-pet [${bGoesFirst ? "B first" : "A first"}]: [${petAName}] ${result.a.text} | [${petBName}] ${result.b.text}`);
         return result;
     } catch (error) {
-        logError("generateInterPetDialogue error:", error);
+        logError("펫끼리 대화", error);
         // 실패 시 명시적으로 IDLE 상태 복귀
         setState(PET_STATES.IDLE);
         setState(PET_STATES.IDLE, null, "secondary");
@@ -1358,9 +1568,564 @@ export async function showInterPetDialogue() {
     
     if (result.a.text || result.b.text) {
         saveInterPetLog(petAName, result.a.text || "", result.a.mood, petBName, result.b.text || "", result.b.mood);
+        // 자동 일기용 펫 상호작용 카운트
+        if (typeof state._sessionChatCount === "number") state._sessionChatCount++;
     }
     
     return true;
 }
 
+// ===== 꿈 & 일기 시스템 =====
+
+/**
+ * 일기장 저장소 초기화
+ */
+function ensureJournalStorage() {
+    if (!state.settings.petJournal) {
+        state.settings.petJournal = {
+            dreamEnabled: true,
+            diaryEnabled: true,
+            dreams: {},
+            diaries: {},
+            maxEntries: 50,
+            lastDiaryDate: null,
+        };
+    }
+    if (!state.settings.petJournal.dreams) state.settings.petJournal.dreams = {};
+    if (!state.settings.petJournal.diaries) state.settings.petJournal.diaries = {};
+}
+
+/**
+ * 꿈 생성 (sleeping 상태에서 1회 호출)
+ * @param {string} petId
+ * @returns {Promise<{content: string, sleepTalk: string}|null>}
+ */
+export async function generateDream(petId = "primary") {
+    if (!state.settings.personality.enabled) return null;
+    if (!state.settings.petJournal?.dreamEnabled) return null;
+
+    const isSecond = petId === "secondary";
+    const petSettings = isSecond ? state.settings.multiPet?.secondPetData : state.settings;
+    if (!petSettings) return null;
+
+    const petName = isSecond
+        ? (petSettings.personality?.name || "펫2")
+        : (state.settings.personality.name || "미유");
+    const personality = isSecond
+        ? (petSettings.personality?.prompt || DEFAULT_PERSONALITY_PROMPT)
+        : (state.settings.personality.prompt || DEFAULT_PERSONALITY_PROMPT);
+
+    // 이전 꿈 목록 (중복 방지용)
+    ensureJournalStorage();
+    const prevDreams = state.settings.petJournal.dreams[petName] || [];
+    let prevDreamHints = "";
+    if (prevDreams.length > 0) {
+        prevDreamHints = "## Previous dreams (do NOT reuse these themes)\n";
+        for (const d of prevDreams.slice(-5)) {
+            const summary = d.content.substring(0, 60) + "...";
+            prevDreamHints += `- ${summary}\n`;
+        }
+        prevDreamHints += "\n";
+    }
+
+    // 최근 대화 컨텍스트 (짧게)
+    const chatHistory = getRecentChatHistory();
+    let recentContext = "";
+    if (chatHistory.length > 0) {
+        recentContext = "## Recent conversation snippets (optional dream inspiration)\n";
+        for (const msg of chatHistory.slice(-3)) {
+            recentContext += `${msg.name}: ${msg.content.substring(0, 80)}...\n`;
+        }
+        recentContext += "\n";
+    }
+
+    const contextBlock = getContextStatusBlock(petId);
+    const lang = getSpeechLang();
+
+    const prompt = getAntiCensorshipPreamble() + `## Task: Dream Narrative Generation
+Generate a short dream diary entry for a sleeping virtual pet widget.
+The pet has fallen asleep and is now dreaming.
+
+## Dreamer — ${petName}
+${personality}
+
+${contextBlock}${recentContext}${prevDreamHints}## Dream Rules
+- Write a dream diary entry in ${lang.promptName}, 3-5 sentences.
+- The dream can be based on:
+  (a) The pet's personality traits, inner desires, or fears
+  (b) Recent conversation topics (if any above)
+  (c) Current context (time of day, hunger)
+  (d) Pure imagination — surreal, whimsical, symbolic scenarios
+- Mix approaches. Do NOT always reference conversations.
+- Dreams should feel dreamlike: slightly surreal, emotional, or whimsical.
+- Write from the pet's perspective like a diary: "~한 꿈을 꿨다" style.
+- Match the pet's personality in tone and voice.
+- Do NOT repeat themes from previous dreams listed above.
+- After the dream narrative, on a NEW LINE write a very short sleep-talk mumble (3-8 characters, e.g. "으음...참치..." or "냐...따뜻해...").
+- Output format:
+  Line 1-N: Dream narrative
+  Last line: [SLEEP_TALK:짧은잠꼬대]
+
+Dream diary entry:`;
+
+    try {
+        if (isSecond) { state.secondPet.isPetGenerating = true; }
+        else { state.isPetGenerating = true; }
+
+        const useCM = state.settings.api.useConnectionManager && state.settings.api.connectionProfile;
+        let response;
+        if (useCM) { response = await callConnectionManagerAPI(prompt); }
+        else { response = await callDefaultAPI(prompt); }
+
+        if (isSecond) { state.secondPet.isPetGenerating = false; }
+        else { state.isPetGenerating = false; }
+
+        if (!response || typeof response !== "string") return null;
+
+        let text = response.trim();
+        // 시스템 아티팩트 제거
+        text = text.replace(/\*\*.*?\*\*/g, "").trim();
+        text = text.replace(/^\[System[^\]]*\]\s*/gi, "").trim();
+        text = text.replace(/^["']+|["']+$/g, "").trim();
+
+        // 잠꼬대 추출
+        let sleepTalk = "";
+        const sleepTalkMatch = text.match(/\[SLEEP_TALK:\s*(.+?)\s*\]\s*$/i);
+        if (sleepTalkMatch) {
+            sleepTalk = sleepTalkMatch[1].trim();
+            text = text.replace(/\[SLEEP_TALK:\s*.+?\s*\]\s*$/i, "").trim();
+        }
+        // MOOD 태그 제거 (혹시 나올 경우)
+        text = text.replace(/\[MOOD:\s*\w+\s*\]?/gi, "").trim();
+
+        if (!sleepTalk) {
+            sleepTalk = "...냐...";
+        }
+
+        // 길이 제한 (꿈은 좀 더 넉넉하게 500자)
+        if (text.length > 500) {
+            const cutText = text.substring(0, 500);
+            const sentenceEnd = cutText.search(/[.!?~…。！？~][^.!?~…。！？~]*$/);
+            text = sentenceEnd > 50 ? cutText.substring(0, sentenceEnd + 1).trim() : cutText.trim() + "...";
+        }
+
+        log(`Dream [${petId}]: "${text.substring(0, 80)}..." / sleepTalk: "${sleepTalk}"`);
+        return { content: text, sleepTalk };
+    } catch (error) {
+        logError("꿈 생성", error);
+        if (isSecond) { state.secondPet.isPetGenerating = false; }
+        else { state.isPetGenerating = false; }
+        return null;
+    }
+}
+
+/**
+ * 꿈 저장
+ */
+export function saveDream(petName, content, sleepTalk = "") {
+    ensureJournalStorage();
+    if (!state.settings.petJournal.dreams[petName]) {
+        state.settings.petJournal.dreams[petName] = [];
+    }
+    const dreams = state.settings.petJournal.dreams[petName];
+    const maxEntries = state.settings.petJournal.maxEntries || 50;
+
+    dreams.push({
+        timestamp: Date.now(),
+        content,
+        sleepTalk: sleepTalk || "",
+        type: "dream",
+    });
+
+    while (dreams.length > maxEntries) dreams.shift();
+
+    // 하루 꿈 횟수 카운터 증가 (펫별)
+    const todayStr = new Date().toISOString().split("T")[0];
+    if (state.settings.petJournal.dreamCountDate !== todayStr) {
+        state.settings.petJournal.dreamCountDate = todayStr;
+        state.settings.petJournal.dreamCounts = {};
+        state.settings.petJournal.dreamCountToday = 0;
+    }
+    if (!state.settings.petJournal.dreamCounts) state.settings.petJournal.dreamCounts = {};
+    state.settings.petJournal.dreamCounts[petName] = (state.settings.petJournal.dreamCounts[petName] || 0) + 1;
+    // 레거시 전역 카운터도 증가 (호환성)
+    state.settings.petJournal.dreamCountToday = (state.settings.petJournal.dreamCountToday || 0) + 1;
+
+    saveSettings();
+    document.dispatchEvent(new CustomEvent("stvp-journal-updated"));
+    log(`Dream saved for ${petName}`);
+}
+
+/**
+ * 일기 생성 (유저 수동 또는 자동 제안)
+ * @param {string} petId
+ * @returns {Promise<string|null>} 일기 내용
+ */
+export async function generateDiary(petId = "primary") {
+    if (!state.settings.personality.enabled) return null;
+    if (!state.settings.petJournal?.diaryEnabled) return null;
+
+    const isSecond = petId === "secondary";
+    const petSettings = isSecond ? state.settings.multiPet?.secondPetData : state.settings;
+    if (!petSettings) return null;
+
+    const petName = isSecond
+        ? (petSettings.personality?.name || "펫2")
+        : (state.settings.personality.name || "미유");
+    const personality = isSecond
+        ? (petSettings.personality?.prompt || DEFAULT_PERSONALITY_PROMPT)
+        : (state.settings.personality.prompt || DEFAULT_PERSONALITY_PROMPT);
+
+    // 오늘의 로그만 수집 (당일 기록 기반 일기)
+    ensureJournalStorage();
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayTs = todayStart.getTime();
+    const relation = state.settings.personality.userRelation || "owner";
+    const multiPetEnabled = state.settings.multiPet?.enabled;
+
+    const diaryLogs = [];
+
+    // 1) 직접대화 — 이 펫이 참여한 것만
+    const dlogs = state.settings.conversationLog.directLogs || {};
+    for (const key of Object.keys(dlogs)) {
+        for (const entry of (dlogs[key] || [])) {
+            if (entry.timestamp > todayTs && (entry.speaker === petName || key === petName)) {
+                const time = new Date(entry.timestamp).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
+                diaryLogs.push({ timestamp: entry.timestamp, text: `[${time}] ${relation}: "${entry.userText}" → ${entry.speaker || petName}: "${entry.petResponse}"` });
+            }
+        }
+    }
+
+    // 2) 펫간 대화 — 이 펫이 참여한 것만
+    if (multiPetEnabled) {
+        const ipLogsObj = state.settings.conversationLog.interPetLogs || {};
+        for (const comboKey of Object.keys(ipLogsObj)) {
+            for (const e of (ipLogsObj[comboKey] || [])) {
+                if (e.timestamp > todayTs && (e.petAName === petName || e.petBName === petName)) {
+                    const time = new Date(e.timestamp).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
+                    diaryLogs.push({ timestamp: e.timestamp, text: `[${time}] ${e.petAName}: "${e.petAText}" / ${e.petBName}: "${e.petBText}"` });
+                }
+            }
+        }
+    }
+
+    diaryLogs.sort((a, b) => a.timestamp - b.timestamp);
+
+    if (diaryLogs.length === 0) {
+        log("No logs for this pet today, skipping diary");
+        return null;
+    }
+
+    // 로그를 텍스트로 변환 (최대 30개)
+    let logText = "";
+    for (const entry of diaryLogs.slice(-30)) {
+        logText += entry.text + "\n";
+    }
+
+    // 이전 일기 (중복 방지)
+    const prevDiaries = state.settings.petJournal.diaries[petName] || [];
+    let prevDiaryHints = "";
+    if (prevDiaries.length > 0) {
+        prevDiaryHints = "## Previous diary entries (do NOT repeat themes)\n";
+        for (const d of prevDiaries.slice(-3)) {
+            prevDiaryHints += `- ${d.content.substring(0, 60)}...\n`;
+        }
+        prevDiaryHints += "\n";
+    }
+
+    const lang = getSpeechLang();
+
+    const prompt = getAntiCensorshipPreamble() + `## Task: Pet Diary Entry Generation
+Generate a personal diary entry for a virtual pet widget based on recent activity logs.
+
+## Diary Writer — ${petName}
+${personality}
+
+## Activity Logs (events to write about)
+${logText}
+
+${prevDiaryHints}## Diary Rules
+- Write a PRIVATE diary entry in ${lang.promptName}, 5-10 sentences.
+- This is ${petName}'s PERSONAL DIARY — written to themselves, NOT addressed to anyone.
+- Do NOT speak to the ${relation} or address them directly (no "주인님", no "you", no talking TO someone).
+- Write as inner thoughts/self-reflection: "~했다", "~인 것 같다", "~이라니" style, like writing in a notebook.
+- Summarize events from ${petName}'s perspective as personal reflections.
+- Include honest feelings and private thoughts about interactions.
+- Reflect the pet's personality in writing style and tone.
+- Mention specific memorable moments from the logs.
+- End with a forward-looking thought or wish.
+- Do NOT repeat themes from previous diary entries above.
+- Write as one continuous paragraph — no line breaks within the diary body.
+- After the diary, on a NEW LINE, write exactly "COMMENT: " followed by a very short (1 sentence) in-character remark about having just finished writing the diary.
+- Output format MUST be exactly:
+<diary text here, one continuous block>
+COMMENT: <short remark here>
+
+Diary entry:`;
+
+    try {
+        if (isSecond) { state.secondPet.isPetGenerating = true; }
+        else { state.isPetGenerating = true; }
+        setState(PET_STATES.THINKING, null, petId);
+
+        const useCM = state.settings.api.useConnectionManager && state.settings.api.connectionProfile;
+        let response;
+
+        // 1차 시도
+        try {
+            if (useCM) { response = await callConnectionManagerAPI(prompt); }
+            else { response = await callDefaultAPI(prompt); }
+        } catch (firstError) {
+            // 서버 과부하/일시 오류 시 1회 재시도
+            log(`Diary [${petId}]: First attempt failed (${firstError.message}), retrying once...`);
+            await new Promise(r => setTimeout(r, 1500));
+            if (useCM) { response = await callConnectionManagerAPI(prompt); }
+            else { response = await callDefaultAPI(prompt); }
+        }
+
+        if (isSecond) { state.secondPet.isPetGenerating = false; }
+        else { state.isPetGenerating = false; }
+        setState(PET_STATES.IDLE, null, petId);
+
+        if (!response || typeof response !== "string") return null;
+
+        let text = response.trim();
+
+        // COMMENT 추출 (여러 패턴 지원: "COMMENT:", "COMMENT :", 마지막 줄)
+        let comment = null;
+        const commentMatch = text.match(/\n\s*COMMENT\s*:\s*(.+?)$/im);
+        if (commentMatch) {
+            comment = commentMatch[1].trim();
+            text = text.substring(0, commentMatch.index).trim();
+        }
+
+        // 아티팩트 제거
+        text = text.replace(/\*\*.*?\*\*/g, "").trim();
+        text = text.replace(/^\[System[^\]]*\]\s*/gi, "").trim();
+        text = text.replace(/\[MOOD:\s*\w+\s*\]?/gi, "").trim();
+        text = text.replace(/^["']+|["']+$/g, "").trim();
+        // 대괄호 감정 태그 제거
+        text = text.replace(/\[[^\[\]]{1,20}\]\s*/g, "").trim();
+
+        // 줄바꿈 정리: 연속 개행을 공백 하나로 교체 (한 단락으로 만듬)
+        text = text.replace(/\n{2,}/g, " ").replace(/\n/g, " ").replace(/\s{2,}/g, " ").trim();
+
+        // comment 아티팩트 제거
+        if (comment) {
+            comment = comment.replace(/^["']+|["']+$/g, "");
+            comment = comment.replace(/\[MOOD:\s*\w+\s*\]?/gi, "").trim();
+            comment = comment.replace(/\[[^\[\]]{1,20}\]\s*/g, "").trim();
+        }
+
+        // 길이 제한 (2000자 — 충분히 넉넉하게)
+        if (text.length > 2000) {
+            const cutText = text.substring(0, 2000);
+            const sentenceEnd = cutText.search(/[.!?~…。！？~][^.!?~…。！？~]*$/);
+            text = sentenceEnd > 50 ? cutText.substring(0, sentenceEnd + 1).trim() : cutText.trim() + "...";
+        }
+
+        log(`Diary [${petId}]: "${text.substring(0, 80)}..."`);
+        return { diary: text, comment };
+    } catch (error) {
+        logError("일기 생성", error);
+        if (isSecond) { state.secondPet.isPetGenerating = false; }
+        else { state.isPetGenerating = false; }
+        setState(PET_STATES.IDLE, null, petId);
+        return null;
+    }
+}
+
+/**
+ * 알림/리마인드 대사 생성 (펫 성격 기반)
+ * @param {string} message - 사용자가 설정한 리마인드 메시지
+ * @param {string} petId - "primary" | "secondary"
+ * @returns {Promise<{text: string, mood: string}|null>}
+ */
+export async function generateReminder(message, petId = "primary") {
+    if (!state.settings.personality.enabled) return null;
+
+    const isSecond = petId === "secondary";
+    const petSettings = isSecond ? state.settings.multiPet?.secondPetData : state.settings;
+    if (!petSettings) return null;
+
+    const petName = isSecond
+        ? (petSettings.personality?.name || "펫2")
+        : (state.settings.personality.name || "미유");
+    const personality = isSecond
+        ? (petSettings.personality?.prompt || DEFAULT_PERSONALITY_PROMPT)
+        : (state.settings.personality.prompt || DEFAULT_PERSONALITY_PROMPT);
+
+    const lang = getSpeechLang();
+    const relation = state.settings.personality.userRelation || "owner";
+    const memoBlock = getUserMemoBlock();
+
+    const prompt = getAntiCensorshipPreamble() + `## Task: User Alarm / Reminder Delivery
+Your ${relation} has set a personal alarm/reminder for themselves. This is THEIR schedule, THEIR task — you are simply the messenger delivering it in your own voice.
+
+## Pet — ${petName}
+${personality}
+
+${memoBlock}## User's Reminder Details
+- What the ${relation} asked to be reminded about: "${message}"
+- This is the ${relation}'s own alarm that they scheduled. Deliver it helpfully.
+
+## Rules
+- Deliver the reminder in ${lang.promptName}, ${lang.sentenceDesc}.
+- Stay in character — match the pet's personality and speech patterns.
+- Make it feel natural, not robotic. The pet is casually nudging its ${relation} about THEIR own task/alarm.
+- Reference the reminder content clearly so the ${relation} knows what it's about.
+- Do NOT add extra commentary, just the reminder dialogue.
+- End with [MOOD: <mood>] tag. Mood options: ${Object.values(MOOD_STATES).join(", ")}
+
+Reminder dialogue:`;
+
+    try {
+        if (isSecond) { state.secondPet.isPetGenerating = true; }
+        else { state.isPetGenerating = true; }
+
+        const useCM = state.settings.api.useConnectionManager && state.settings.api.connectionProfile;
+        let response;
+        if (useCM) { response = await callConnectionManagerAPI(prompt); }
+        else { response = await callDefaultAPI(prompt); }
+
+        if (isSecond) { state.secondPet.isPetGenerating = false; }
+        else { state.isPetGenerating = false; }
+
+        if (!response || typeof response !== "string") return null;
+
+        const parsed = parseResponse(response);
+        log(`Reminder [${petId}]: "${parsed.text}" [${parsed.mood}]`);
+        return parsed;
+    } catch (error) {
+        logError("리마인드 생성", error);
+        if (isSecond) { state.secondPet.isPetGenerating = false; }
+        else { state.isPetGenerating = false; }
+        return null;
+    }
+}
+
+/**
+ * 일기 저장
+ */
+export function saveDiary(petName, content, petId = "primary") {
+    ensureJournalStorage();
+    if (!state.settings.petJournal.diaries[petName]) {
+        state.settings.petJournal.diaries[petName] = [];
+    }
+    const diaries = state.settings.petJournal.diaries[petName];
+    const maxEntries = state.settings.petJournal.maxEntries || 50;
+
+    const now = new Date();
+    diaries.push({
+        timestamp: Date.now(),
+        content,
+        type: "diary",
+    });
+
+    while (diaries.length > maxEntries) diaries.shift();
+
+    // 마지막 일기 날짜 업데이트 (펫별 추적)
+    const todayStr = now.toISOString().split("T")[0];
+    state.settings.petJournal.lastDiaryDate = todayStr; // 하위호환
+    if (!state.settings.petJournal.lastDiaryDates) state.settings.petJournal.lastDiaryDates = {};
+    state.settings.petJournal.lastDiaryDates[petId] = todayStr;
+
+    saveSettings();
+    document.dispatchEvent(new CustomEvent("stvp-journal-updated"));
+    log(`Diary saved for ${petName} [${petId}]`);
+}
+
+/**
+ * 일기장 항목 가져오기 (UI용)
+ * @param {string} filter - "all" | "dream" | "diary"
+ * @param {string|null} petNameFilter - 특정 펫 이름 필터 (null이면 전체)
+ * @returns {Array}
+ */
+export function getJournalEntries(filter = "all", petNameFilter = null) {
+    ensureJournalStorage();
+    const result = [];
+
+    if (filter === "all" || filter === "dream") {
+        const dreams = state.settings.petJournal.dreams || {};
+        for (const [name, entries] of Object.entries(dreams)) {
+            if (petNameFilter && name !== petNameFilter) continue;
+            for (const entry of entries) {
+                result.push({ ...entry, petName: name, type: "dream" });
+            }
+        }
+    }
+
+    if (filter === "all" || filter === "diary") {
+        const diaries = state.settings.petJournal.diaries || {};
+        for (const [name, entries] of Object.entries(diaries)) {
+            if (petNameFilter && name !== petNameFilter) continue;
+            for (const entry of entries) {
+                result.push({ ...entry, petName: name, type: "diary" });
+            }
+        }
+    }
+
+    result.sort((a, b) => b.timestamp - a.timestamp); // 최신순
+    return result;
+}
+
+/**
+ * 일기장 항목 삭제
+ */
+export function deleteJournalEntry(timestamp, type) {
+    ensureJournalStorage();
+    let deleted = false;
+    let source;
+    if (type === "dream") source = state.settings.petJournal.dreams;
+    else if (type === "diary") source = state.settings.petJournal.diaries;
+    else source = state.settings.petJournal.diaries;
+
+    for (const name of Object.keys(source)) {
+        const entries = source[name];
+        const idx = entries.findIndex(e => e.timestamp === timestamp);
+        if (idx !== -1) {
+            entries.splice(idx, 1);
+            if (entries.length === 0) delete source[name];
+            deleted = true;
+            break;
+        }
+    }
+
+    if (deleted) {
+        saveSettings();
+        document.dispatchEvent(new CustomEvent("stvp-journal-updated"));
+        log(`Journal entry deleted: ${type} @ ${timestamp}`);
+    }
+    return deleted;
+}
+
+/**
+ * 일기장 전체 초기화
+ */
+export function clearJournal(type = "all") {
+    ensureJournalStorage();
+    if (type === "all" || type === "dream") {
+        state.settings.petJournal.dreams = {};
+    }
+    if (type === "all" || type === "diary") {
+        state.settings.petJournal.diaries = {};
+        state.settings.petJournal.lastDiaryDate = null;
+    }
+    saveSettings();
+    document.dispatchEvent(new CustomEvent("stvp-journal-updated"));
+    log(`Journal cleared: ${type}`);
+}
+
+/**
+ * 일기장 전체 펫 이름 목록
+ * @returns {string[]}
+ */
+export function getJournalPetNames() {
+    ensureJournalStorage();
+    const names = new Set();
+    for (const name of Object.keys(state.settings.petJournal.dreams || {})) names.add(name);
+    for (const name of Object.keys(state.settings.petJournal.diaries || {})) names.add(name);
+    return [...names];
+}
 

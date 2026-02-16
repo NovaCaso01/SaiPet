@@ -71,9 +71,12 @@ export function setState(newState, duration = null, petId = "primary") {
     const containerId = petId === "secondary" ? "saipet-container-2" : "saipet-container";
     applyStateAnimation(newState, containerId);
     
-    // 지속 시간 후 idle로 복귀
+    // 지속 시간 후 idle로 복귀 (이전 타이머 정리하여 충돌 방지)
     if (duration !== null) {
-        setTimeout(() => {
+        const timerKey = petId === "secondary" ? "_stateRevertTimer2" : "_stateRevertTimer";
+        if (state[timerKey]) clearTimeout(state[timerKey]);
+        state[timerKey] = setTimeout(() => {
+            state[timerKey] = null;
             const curState = petId === "secondary" ? state.secondPet.currentState : state.currentState;
             if (curState === newState) {
                 setState(PET_STATES.IDLE, null, petId);
@@ -186,4 +189,36 @@ export function hideSleepZzz(petId = "primary") {
     
     const zzz = container.querySelector(".st-pet-zzz");
     if (zzz) zzz.remove();
+}
+
+/**
+ * 꿈 이펙트 표시 (zzZ 형태, 꿈 생성 중 표시)
+ */
+export function showDreamEffect(petId = "primary") {
+    const containerId = petId === "secondary" ? "saipet-container-2" : "saipet-container";
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    // 이미 있으면 스킵
+    if (container.querySelector(".st-pet-dream")) return;
+
+    const wrapper = container.querySelector(".st-pet-wrapper");
+    if (!wrapper) return;
+
+    const dream = document.createElement("div");
+    dream.className = "st-pet-dream";
+    dream.innerHTML = `<span class="dream-1">z</span><span class="dream-2">z</span><span class="dream-3">Z</span>`;
+    wrapper.appendChild(dream);
+}
+
+/**
+ * 꿈 이펙트 💭 제거
+ */
+export function hideDreamEffect(petId = "primary") {
+    const containerId = petId === "secondary" ? "saipet-container-2" : "saipet-container";
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    const dream = container.querySelector(".st-pet-dream");
+    if (dream) dream.remove();
 }

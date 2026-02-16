@@ -60,6 +60,7 @@ export function showSpeechBubble(text, duration = null, priority = false, petId 
     bubbleEl.classList.add("show");
     
     // 늦게 뜬 말풍선이 위에 오도록 컨테이너 z-index 갱신
+    if (bubbleZCounter > 99999) bubbleZCounter = 9999;
     bubbleZCounter++;
     const container = isSecond
         ? document.getElementById("saipet-container-2")
@@ -141,36 +142,38 @@ function adjustBubblePosition(petId = "primary") {
         const containerCenterX = containerRect.left + containerRect.width / 2;
         const margin = 8;
         
-        // === 상하 보정: 말풍선이 화면 위로 삐져나가면 하단으로 ===
-        if (bubbleRect.top < margin) {
-            bubble.classList.add("below");
-        }
+        // 1차 판단: 위로 삐져나가는지만 확인
+        let needBelow = bubbleRect.top < margin;
         
-        // 하단 모드일 때 화면 아래로 삐져나가면 다시 상단으로
-        if (bubble.classList.contains("below")) {
-            const belowRect = bubble.getBoundingClientRect();
-            if (belowRect.bottom > vh - margin) {
-                bubble.classList.remove("below");
+        // 위치 결정 후 한 번에 적용 (layout thrashing 방지)
+        requestAnimationFrame(() => {
+            if (needBelow) {
+                bubble.classList.add("below");
+                // 하단 모드에서 아래로 삐져나가면 다시 상단으로
+                const belowRect = bubble.getBoundingClientRect();
+                if (belowRect.bottom > vh - margin) {
+                    bubble.classList.remove("below");
+                }
             }
-        }
-        
-        // === 좌우 보정 ===
-        const finalRect = bubble.getBoundingClientRect();
-        let shiftPx = 0;
-        
-        if (finalRect.left < margin) {
-            shiftPx = margin - finalRect.left;
-        } else if (finalRect.right > vw - margin) {
-            shiftPx = (vw - margin) - finalRect.right;
-        }
-        
-        if (shiftPx !== 0) {
-            bubble.style.setProperty("--bubble-offset-x", `calc(-50% + ${shiftPx}px)`);
             
-            const tailLeft = containerCenterX - (finalRect.left + shiftPx);
-            const clampedTail = Math.max(12, Math.min(tailLeft, finalRect.width - 12));
-            bubble.style.setProperty("--tail-left", `${clampedTail}px`);
-        }
+            // === 좌우 보정 ===
+            const finalRect = bubble.getBoundingClientRect();
+            let shiftPx = 0;
+            
+            if (finalRect.left < margin) {
+                shiftPx = margin - finalRect.left;
+            } else if (finalRect.right > vw - margin) {
+                shiftPx = (vw - margin) - finalRect.right;
+            }
+            
+            if (shiftPx !== 0) {
+                bubble.style.setProperty("--bubble-offset-x", `calc(-50% + ${shiftPx}px)`);
+                
+                const tailLeft = containerCenterX - (finalRect.left + shiftPx);
+                const clampedTail = Math.max(12, Math.min(tailLeft, finalRect.width - 12));
+                bubble.style.setProperty("--tail-left", `${clampedTail}px`);
+            }
+        });
     });
 }
 
@@ -197,7 +200,7 @@ function applyBubbleStyle(petId = "primary") {
 
 /**
  * 상황에 맞는 랜덤 대사 가져오기
- * @param {string} speechType - idle, sleeping, dragging 중 하나
+ * @param {string} speechType - idle, sleeping, dragging, click, greeting, latenight, morning, clickSpam, longAbsence, feeding, hungry, petting 중 하나
  * @returns {string}
  */
 export function getRandomSpeech(speechType, petId = "primary") {
