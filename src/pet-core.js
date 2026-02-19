@@ -220,13 +220,18 @@ export function updatePetSprite() {
         }
         // 같은 이미지면 DOM 교체 생략 (GIF 재시작 방지 + 성능)
         const existingImg = state.petElement.querySelector("img");
-        if (!existingImg || existingImg.src !== imgSrc) {
-            state.petElement.innerHTML = `<img src="${imgSrc}" alt="pet" draggable="false">`;
+        if (!existingImg || existingImg.getAttribute("src") !== imgSrc) {
+            state.petElement.textContent = "";
+            const img = document.createElement("img");
+            img.src = imgSrc;
+            img.alt = "pet";
+            img.draggable = false;
+            state.petElement.appendChild(img);
         }
         state.petElement.classList.add("has-image");
     } else {
         // 이모지 또는 텍스트
-        state.petElement.innerHTML = sprite || "🐱";
+        state.petElement.textContent = sprite || "🐱";
         state.petElement.classList.remove("has-image");
     }
     
@@ -736,9 +741,7 @@ function doWalkStep() {
             sp.classList.toggle("flipped", state.settings.appearance.flipHorizontal);
         }
         
-        // 위치 저장 (state만 업데이트, 디스크 저장은 생략 — 걷기 위치는 휘발성)
-        state.settings.position.customX = clampedX;
-        state.settings.position.customY = clampedY;
+        // 걷기 위치는 임시(휘발성) — settings에 저장하지 않음 (드래그만 저장)
         
         // 충돌 감지
         checkAndResolvePetCollision("primary");
@@ -771,7 +774,12 @@ function applyWalkSprite(spriteData) {
         if (!spriteData.startsWith("data:") && !spriteData.startsWith("http")) {
             imgSrc = `${EXTENSION_BASE_PATH}${spriteData}`;
         }
-        state.petElement.innerHTML = `<img src="${imgSrc}" alt="pet-walk" draggable="false">`;
+        state.petElement.textContent = "";
+        const img = document.createElement("img");
+        img.src = imgSrc;
+        img.alt = "pet-walk";
+        img.draggable = false;
+        state.petElement.appendChild(img);
         state.petElement.classList.add("has-image");
     }
 }
@@ -912,12 +920,17 @@ export function updateSecondPetSprite() {
         }
         // 같은 이미지면 DOM 교체 생략 (GIF 재시작 방지 + 성능)
         const existingImg = state.secondPet.petElement.querySelector("img");
-        if (!existingImg || existingImg.src !== imgSrc) {
-            state.secondPet.petElement.innerHTML = `<img src="${imgSrc}" alt="pet2" draggable="false">`;
+        if (!existingImg || existingImg.getAttribute("src") !== imgSrc) {
+            state.secondPet.petElement.textContent = "";
+            const img = document.createElement("img");
+            img.src = imgSrc;
+            img.alt = "pet2";
+            img.draggable = false;
+            state.secondPet.petElement.appendChild(img);
         }
         state.secondPet.petElement.classList.add("has-image");
     } else {
-        state.secondPet.petElement.innerHTML = sprite || "🐱";
+        state.secondPet.petElement.textContent = sprite || "🐱";
         state.secondPet.petElement.classList.remove("has-image");
     }
     
@@ -980,8 +993,9 @@ function updateSecondPetSize() {
 function updateSecondPetOpacity() {
     const container = document.getElementById("saipet-container-2");
     if (!container) return;
-    const spd = state.settings.multiPet?.secondPetData;
-    container.style.opacity = (spd?.appearance?.opacity ?? 100) / 100;
+    // 공통 설정: 메인 펫의 투명도를 함께 적용
+    const opacity = (state.settings.appearance.opacity ?? 100) / 100;
+    container.style.opacity = opacity;
 }
 
 function applySecondPetDesignTheme() {
@@ -1243,7 +1257,12 @@ function doSecondPetWalkStep() {
             if (!walkSprite.startsWith("data:") && !walkSprite.startsWith("http")) {
                 imgSrc = `${EXTENSION_BASE_PATH}${walkSprite}`;
             }
-            state.secondPet.petElement.innerHTML = `<img src="${imgSrc}" alt="pet2-walk" draggable="false">`;
+            state.secondPet.petElement.textContent = "";
+            const img = document.createElement("img");
+            img.src = imgSrc;
+            img.alt = "pet2-walk";
+            img.draggable = false;
+            state.secondPet.petElement.appendChild(img);
             state.secondPet.petElement.classList.add("has-image");
         }
     }
@@ -1271,8 +1290,7 @@ function doSecondPetWalkStep() {
         if (state.secondPet._isWalkingSprite) { state.secondPet._isWalkingSprite = false; updateSecondPetSprite(); }
         const sp = c.querySelector(".st-pet-sprite");
         if (sp) sp.classList.toggle("flipped", spd?.appearance?.flipHorizontal || false);
-        state.settings.multiPet.secondPetPosition.customX = clampedX;
-        state.settings.multiPet.secondPetPosition.customY = clampedY;
+        // 걷기 위치는 임시(휘발성) — settings에 저장하지 않음 (드래그만 저장)
         checkAndResolvePetCollision("secondary");
         const we = spd?.walk?.enabled ?? state.settings.walk?.enabled;
         if (we) scheduleNextSecondPetWalk();
@@ -1333,6 +1351,7 @@ export function checkAndResolvePetCollision(movingPetId = "primary") {
         state.settings.position.customY = clampedY;
         resetWalkOrigin();
     }
+    saveSettings();
     
     import("./pet-animation.js").then(({ playBounce }) => playBounce(pushedId));
     const customCollision = pushedId === "secondary"

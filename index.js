@@ -21,18 +21,15 @@ function detectMobile() {
     
     // 태블릿 감지 (태블릿은 활성화 유지)
     const isTablet = /iPad/i.test(ua)
-        || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)  // iPadOS 13+
+        || (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1)  // iPadOS 13+ (UA에 "Macintosh" 포함)
         || (/Android/i.test(ua) && !/Mobile/i.test(ua));  // Android 태블릿 (Mobile 키워드 없음)
     
     if (isTablet) return false;
     
-    // 스마트폰 감지
+    // 스마트폰만 감지 (UA 기반 — 터치+화면크기 조합은 태블릿 세로모드 오탐 위험)
     const isMobileUA = /Android.*Mobile|webOS|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
-    const hasTouchOnly = ('ontouchstart' in window) && !window.matchMedia('(pointer: fine)').matches;
-    const isSmallScreen = window.matchMedia('(max-width: 768px)').matches;
     
-    // UA가 모바일이고 화면이 작을 때만 모바일 판정
-    return (isMobileUA && isSmallScreen) || (hasTouchOnly && isSmallScreen);
+    return isMobileUA;
 }
 
 /**

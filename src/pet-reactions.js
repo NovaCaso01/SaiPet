@@ -524,7 +524,7 @@ function stopIdleTimer() {
 
 let conditionTimer = null;
 const CONDITION_INTERVAL = 5 * 60 * 1000; // 5분마다 체크
-const HUNGER_DECAY_PER_CHECK = 3;          // 5분마다 배고픔 -3 (약 2.7시간에 0)
+const HUNGER_DECAY_PER_CHECK = 1;          // 5분마다 배고픔 -1 (약 8.3시간에 0)
 const HUNGER_WARNING = 30;                  // 이 이하면 배고픔 알림
 let hungryNotified = false;                 // 배고픔 알림 중복 방지
 let secondPetHungryNotified = false;        // 2번째 펫 배고픔 알림 중복 방지
@@ -1038,7 +1038,7 @@ async function checkAutoDiary() {
     if (!autoDiary?.enabled) return;
     if (!state.settings.petJournal?.diaryEnabled) return;
     if (autoDiaryInProgress) return;
-    if (state.isPetGenerating || state.isGenerating) return;
+    if (state.isPetGenerating || state.isGenerating || state.secondPet?.isPetGenerating) return;
 
     const todayStr = new Date().toISOString().split("T")[0];
 
